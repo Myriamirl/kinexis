@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function BilanFormView() {
   const [patient] = useState({
@@ -10,7 +10,28 @@ export default function BilanFormView() {
     profilSportif: 'Pivot'
   });
 
-  // BLOC 1 : MOBILITÉ & CONFIANCE (7.2.1)
+  // Gestion des dates et calcul dynamique du délai post-opératoire
+  const [dateBilan, setDateBilan] = useState(new Date().toISOString().split('T')[0]);
+  const [dateOperation, setDateOperation] = useState('2026-07-23');
+  const [delaiPostOp, setDelaiPostOp] = useState('');
+
+  useEffect(() => {
+    if (dateBilan && dateOperation) {
+      const dBilan = new Date(dateBilan);
+      const dOp = new Date(dateOperation);
+      const diffTime = dBilan - dOp;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays < 0) {
+        setDelaiPostOp("Date d'opération postérieure au bilan !");
+      } else {
+        const moisExact = (diffDays / 30.4375).toFixed(1);
+        setDelaiPostOp(`${moisExact} mois (${diffDays} jours)`);
+      }
+    }
+  }, [dateBilan, dateOperation]);
+
+  // BLOC 1 : MOBILITÉ & CONFIANCE
   const [aclRsi, setAclRsi] = useState('18.33');
   const [extG, setExtG] = useState('0');
   const [extD, setExtD] = useState('0');
@@ -26,29 +47,86 @@ export default function BilanFormView() {
   const [vasteG, setVasteG] = useState('80');
   const [vasteD, setVasteD] = useState('200');
 
-  // BLOC 2 : TESTS FONCTIONNELS (7.2.2)
-  const [squatG, setSquatG] = useState('384');
-  const [squatD, setSquatD] = useState('468');
-  const [fenteG, setFenteG] = useState('70');
-  const [fenteD, setFenteD] = useState('88');
-  const [hopG, setHopG] = useState('114');
-  const [hopD, setHopD] = useState('124');
-  const [side15G, setSide15G] = useState('28');
-  const [side15D, setSide15D] = useState('32');
-  const [side30G, setSide30G] = useState('50');
-  const [side30D, setSide30D] = useState('63');
-
-  // BLOC 3 : QUALITÉ DU MOUVEMENT (7.2.3)
-  const [qualite, setQualite] = useState({
-    pelvicDropDroit: false,
-    pelvicDropGauche: true,
-    valgusDroit: false,
-    valgusGauche: true,
-    stiffLandingDroit: false,
-    stiffLandingGauche: false,
+  // BLOC 2A : TESTS FONCTIONNELS QUALITATIFS
+  const [squatQual, setSquatQual] = useState({
+    peakConcG: '384', peakConcD: '468',
+    peakExcG: '320', peakExcD: '410',
+    meanConcG: '290', meanConcD: '350',
+    meanExcG: '250', meanExcD: '310',
+    hauteurCm: '42'
   });
 
-  // BLOC 4 : BILAN DE FORCE VALD (7.2.4)
+  const [cmj, setCmj] = useState({
+    impulsionConcG: '120', impulsionConcD: '145',
+    freinageExcG: '210', freinageExcD: '260',
+    vitesseFreinG: '1.2', vitesseFreinD: '1.5',
+    picReceptionG: '850', picReceptionD: '980',
+    hauteurSautCm: '28'
+  });
+
+  // BLOC 2B : TESTS FONCTIONNELS QUANTITATIFS (GAUCHE / DROITE)
+  const [hopTests, setHopTests] = useState({
+    singleLegG: '114', singleLegD: '124',
+    tripleHopG: '340', tripleHopD: '380',
+    crossoverG: '310', crossoverD: '355',
+    side15G: '28', side15D: '32',
+    side30G: '50', side30D: '63',
+    frontSide30G: '45', frontSide30D: '55',
+    sideMod15G: '25', sideMod15D: '30',
+    sideMod30G: '48', sideMod30D: '58',
+    illinoisModG: '12.4', illinoisModD: '11.2',
+    timed6mG: '2.1', timed6mD: '1.8'
+  });
+
+  // BLOC 3 : QUALITÉ DU MOUVEMENT (LATERAL STEP DOWN G/D)
+  const [qualiteStepDown, setQualiteStepDown] = useState({
+    pelvicDropG: true, pelvicDropD: false,
+    valgusG: true, valgusD: false,
+    stiffLandingG: false, stiffLandingD: false
+  });
+
+  // GRILLE EXACTE QASLS
+  const [qasls, setQasls] = useState({
+    // Utilisation des bras
+    mouvementExcessifBrasG: false, mouvementExcessifBrasD: false,
+    // Alignement du buste
+    inclinePositionsG: true, inclinePositionsD: false,
+    // Niveau du Bassin
+    pertePlanHorizontalG: true, pertePlanHorizontalD: false,
+    basculeOuRotationG: false, basculeOuRotationD: false,
+    // Mouvement de la cuisse
+    abductionHancheG: true, abductionHancheD: false,
+    positionNeutreNonMaintenueG: false, positionNeutreNonMaintenueD: false,
+    // Position du genou
+    rotule2emeOrteilG: false, rotule2emeOrteilD: true,
+    rotuleInterieurPiedG: true, rotuleInterieurPiedD: false,
+    // Stabilité de la posture
+    reequilibrerAutreJambeG: true, reequilibrerAutreJambeD: false,
+    jambeReceptionVacilleG: true, jambeReceptionVacilleD: false
+  });
+
+  // Calcul dynamique du TOTAL Erreurs QASLS
+  const calcTotalQasls = (side) => {
+    const keys = side === 'G'
+      ? ['mouvementExcessifBrasG', 'inclinePositionsG', 'pertePlanHorizontalG', 'basculeOuRotationG', 'abductionHancheG', 'positionNeutreNonMaintenueG', 'rotule2emeOrteilG', 'rotuleInterieurPiedG', 'reequilibrerAutreJambeG', 'jambeReceptionVacilleG']
+      : ['mouvementExcessifBrasD', 'inclinePositionsD', 'pertePlanHorizontalD', 'basculeOuRotationD', 'abductionHancheD', 'positionNeutreNonMaintenueD', 'rotule2emeOrteilD', 'rotuleInterieurPiedD', 'reequilibrerAutreJambeD', 'jambeReceptionVacilleD'];
+    return keys.reduce((acc, key) => acc + (qasls[key] ? 1 : 0), 0);
+  };
+
+  // Photos de contrôle
+  const [photoG, setPhotoG] = useState(null);
+  const [photoD, setPhotoD] = useState(null);
+
+  const handlePhotoUpload = (e, side) => {
+    const file = e.target.files[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      if (side === 'G') setPhotoG(url);
+      else setPhotoD(url);
+    }
+  };
+
+  // BLOC 4 : BILAN DE FORCE VALD
   const [vald, setVald] = useState({
     quadG: 347, quadD: 480,
     ischioG: 183, ischioD: 200,
@@ -57,7 +135,7 @@ export default function BilanFormView() {
     adducteurG: 351, adducteurD: 384,
   });
 
-  // Cibles minimales à 3 Mois (Section 8.4 du CdC)
+  // Cibles minimales à 3 Mois
   const cibles3M = { quad: 5.5, ischio: 4.0, soleaire: 15.0, fessier: 5.0, adducteur: 5.0 };
 
   // Cibles Sport selon le profil
@@ -68,8 +146,8 @@ export default function BilanFormView() {
   // Calculs automatiques
   const calcRelative = (forceN) => (forceN / patient.poids).toFixed(1);
   const calcLSI = (forceOperee, forceSaine) => {
-    if (!forceSaine) return 0;
-    return Math.round((forceOperee / forceSaine) * 100) - 100;
+    if (!forceSaine || Number(forceSaine) === 0) return 0;
+    return Math.round((Number(forceOperee) / Number(forceSaine)) * 100) - 100;
   };
 
   const getLsiBadge = (lsiAbs) => {
@@ -84,7 +162,7 @@ export default function BilanFormView() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-extrabold text-[#1E293B]">Nouveau Bilan Post-LCA</h2>
-          <p className="text-sm text-slate-600 font-medium">
+          <p className="text-sm text-slate-600 font-medium mt-1">
             Patient: <span className="font-bold text-slate-900">{patient.nom}</span> • Côté Opéré: <span className="font-bold text-slate-900">{patient.coteOpere}</span> • Poids: <span className="font-bold text-slate-900">{patient.poids} kg</span>
           </p>
         </div>
@@ -99,331 +177,453 @@ export default function BilanFormView() {
         </div>
       </div>
 
+      {/* BANDEAU DE DATES ET CALCUL POST-OPÉRATOIRE */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between text-xs font-bold">
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500 font-semibold">Date du bilan :</span>
+          <input 
+            type="date" 
+            value={dateBilan} 
+            onChange={(e) => setDateBilan(e.target.value)}
+            className="bg-slate-50 border border-slate-300 rounded-lg p-2 font-bold text-slate-900"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500 font-semibold">Date d'opération :</span>
+          <input 
+            type="date" 
+            value={dateOperation} 
+            onChange={(e) => setDateOperation(e.target.value)}
+            className="bg-slate-50 border border-slate-300 rounded-lg p-2 font-bold text-slate-900"
+          />
+        </div>
+
+        <div className="bg-amber-100 border border-amber-300 px-4 py-2 rounded-xl text-amber-900 font-extrabold flex items-center gap-2">
+          <span>⏱️ Temps écoulé :</span>
+          <span className="text-sm text-slate-950">{delaiPostOp}</span>
+        </div>
+      </div>
+
       <div className="h-1 bg-gradient-to-r from-[#E5A73C] via-[#E5A73C]/50 to-transparent rounded-full"></div>
 
-      {/* RANGÉE 1 : MOBILITÉ & TESTS FONCTIONNELS */}
-      <div className="grid grid-cols-2 gap-8 items-start">
+      {/* RANGÉE 1 : MOBILITÉ & CONFIANCE */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-4">
+        <div className="flex items-center gap-3 border-b pb-3">
+          <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">1</span>
+          <h3 className="font-bold text-slate-800 text-base">Mobilité Articulaire, Cicatrice & Confiance</h3>
+        </div>
 
-        {/* BLOC 1 : Mobilité Articulaire & Confiance */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-4">
-          <div className="flex items-center gap-3 border-b pb-3">
-            <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">1</span>
-            <h3 className="font-bold text-slate-800 text-base">Mobilité Articulaire & Confiance</h3>
-          </div>
-
-          <div className="space-y-4 text-xs">
-            {/* ACL-RSI (Centré) */}
+        <div className="grid grid-cols-3 gap-6 text-xs">
+          {/* ACL-RSI & Vaste Médial */}
+          <div className="space-y-4">
             <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl">
-              <span className="font-bold text-slate-800 w-1/3">Confiance (ACL-RSI) %</span>
-              <div className="flex-1 flex justify-center">
-                <input
-                  type="number"
-                  value={aclRsi}
-                  onChange={(e) => setAclRsi(e.target.value)}
-                  className="w-24 bg-white border border-slate-300 text-slate-900 rounded-lg p-2 text-center font-bold shadow-sm focus:outline-none focus:border-amber-500"
-                />
-              </div>
-              <div className="w-1/3 flex justify-end">
-                <span className={`px-3 py-1 rounded-full text-[10px] font-bold text-white ${Number(aclRsi) >= 60 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                  {Number(aclRsi) >= 60 ? 'Validé' : 'Non-Validé'}
-                </span>
-              </div>
+              <span className="font-bold text-slate-800">Confiance (ACL-RSI) %</span>
+              <input
+                type="number"
+                value={aclRsi}
+                onChange={(e) => setAclRsi(e.target.value)}
+                className="w-20 bg-white border border-slate-300 text-slate-900 rounded-lg p-2 text-center font-bold shadow-sm"
+              />
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold text-white ${Number(aclRsi) >= 60 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                {Number(aclRsi) >= 60 ? 'Validé' : 'Non-Validé'}
+              </span>
             </div>
 
-            {/* ROM Amplitudes (Alignement centré pour G et D) */}
-            <div className="bg-slate-50 p-3.5 rounded-xl space-y-3">
-              <p className="font-bold text-slate-800">Amplitudes ROM (°)</p>
-
-              {/* Extension */}
-              <div className="flex items-center justify-between">
-                <span className="text-slate-700 font-semibold w-1/3">Extension (G / D)</span>
-                <div className="flex-1 flex items-center justify-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-slate-500 font-bold text-[11px]">G:</span>
-                    <input
-                      type="number"
-                      value={extG}
-                      onChange={(e) => setExtG(e.target.value)}
-                      className="w-16 bg-white border border-slate-300 text-slate-900 rounded-lg p-1.5 text-center font-bold shadow-sm focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-slate-500 font-bold text-[11px]">D:</span>
-                    <input
-                      type="number"
-                      value={extD}
-                      onChange={(e) => setExtD(e.target.value)}
-                      className="w-16 bg-white border border-slate-300 text-slate-900 rounded-lg p-1.5 text-center font-bold shadow-sm focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-                <div className="w-1/3 flex justify-end">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold text-white ${Number(extG) === 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                    {Number(extG) === 0 ? 'Validé' : 'Flessum'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Flexion */}
-              <div className="flex items-center justify-between">
-                <span className="text-slate-700 font-semibold w-1/3">Flexion (G / D)</span>
-                <div className="flex-1 flex items-center justify-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-slate-500 font-bold text-[11px]">G:</span>
-                    <input
-                      type="number"
-                      value={flexG}
-                      onChange={(e) => setFlexG(e.target.value)}
-                      className="w-16 bg-white border border-slate-300 text-slate-900 rounded-lg p-1.5 text-center font-bold shadow-sm focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-slate-500 font-bold text-[11px]">D:</span>
-                    <input
-                      type="number"
-                      value={flexD}
-                      onChange={(e) => setFlexD(e.target.value)}
-                      className="w-16 bg-white border border-slate-300 text-slate-900 rounded-lg p-1.5 text-center font-bold shadow-sm focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-                <div className="w-1/3 flex justify-end">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold text-white ${Number(flexG) >= 120 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                    {Number(flexG) >= 120 ? 'Validé' : 'Non-Validé'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* État Cicatriciel (Menus centrés et uniformes) */}
-            <div className="bg-slate-50 p-3.5 rounded-xl space-y-2.5">
-              <p className="font-bold text-slate-800">État Cicatriciel</p>
-              <div className="grid grid-cols-3 gap-3">
-                <select
-                  value={cicatriceTrophicite}
-                  onChange={(e) => setCicatriceTrophicite(e.target.value)}
-                  className="bg-white border border-slate-300 text-slate-900 rounded-lg p-2 font-bold shadow-sm text-center focus:outline-none focus:border-amber-500"
-                >
-                  <option value="Normotrophique">Normotrophique</option>
-                  <option value="Inflammatoire">Inflammatoire</option>
-                  <option value="Hypertrophique">Hypertrophique</option>
-                  <option value="Chéloïde">Chéloïde</option>
-                </select>
-
-                <select
-                  value={cicatriceAdherence}
-                  onChange={(e) => setCicatriceAdherence(e.target.value)}
-                  className="bg-white border border-slate-300 text-slate-900 rounded-lg p-2 font-bold shadow-sm text-center focus:outline-none focus:border-amber-500"
-                >
-                  <option value="Souple et mobile">Souple & mobile</option>
-                  <option value="Adhérence superficielle">Adhérence superficielle</option>
-                  <option value="Adhérence profonde">Adhérence profonde</option>
-                </select>
-
-                <select
-                  value={cicatriceSensibilite}
-                  onChange={(e) => setCicatriceSensibilite(e.target.value)}
-                  className="bg-white border border-slate-300 text-slate-900 rounded-lg p-2 font-bold shadow-sm text-center focus:outline-none focus:border-amber-500"
-                >
-                  <option value="Indolore">Indolore</option>
-                  <option value="Douloureuse">Douloureuse</option>
-                  <option value="Hypoesthésie">Hypoesthésie</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Activation Vaste Médial (Centré) */}
             <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl">
-              <div className="w-1/3">
+              <div>
                 <p className="font-bold text-slate-800">Activation Vaste Médial</p>
                 <p className="text-[10px] text-slate-500">Unités dynamométriques</p>
               </div>
-              <div className="flex-1 flex items-center justify-center gap-3">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-500 font-bold text-[11px]">G:</span>
-                  <input
-                    type="number"
-                    value={vasteG}
-                    onChange={(e) => setVasteG(e.target.value)}
-                    className="w-16 bg-white border border-slate-300 text-slate-900 rounded-lg p-1.5 text-center font-bold shadow-sm focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-500 font-bold text-[11px]">D:</span>
-                  <input
-                    type="number"
-                    value={vasteD}
-                    onChange={(e) => setVasteD(e.target.value)}
-                    className="w-16 bg-white border border-slate-300 text-slate-900 rounded-lg p-1.5 text-center font-bold shadow-sm focus:outline-none focus:border-amber-500"
-                  />
-                </div>
+              <div className="flex gap-2">
+                <input type="number" value={vasteG} onChange={(e) => setVasteG(e.target.value)} className="w-14 bg-white border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" placeholder="G" />
+                <input type="number" value={vasteD} onChange={(e) => setVasteD(e.target.value)} className="w-14 bg-white border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" placeholder="D" />
               </div>
-              <div className="w-1/3 flex justify-end">
-                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold text-white ${Number(vasteG) < 80 ? 'bg-rose-500' : Number(vasteG) < 150 ? 'bg-amber-500' : 'bg-emerald-500'}`}>
-                  {Number(vasteG) < 80 ? 'AMI Sévère' : Number(vasteG) < 150 ? 'Inhibition Modérée' : 'Optimal'}
-                </span>
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(vasteG) < 80 ? 'bg-rose-500' : Number(vasteG) < 150 ? 'bg-amber-500' : 'bg-emerald-500'}`}>
+                {Number(vasteG) < 80 ? 'Inhibition' : 'OK'}
+              </span>
+            </div>
+          </div>
+
+          {/* Amplitudes ROM */}
+          <div className="bg-slate-50 p-3.5 rounded-xl space-y-3">
+            <p className="font-bold text-slate-800">Amplitudes ROM (°)</p>
+            <div className="flex items-center justify-between">
+              <span className="text-slate-700 font-semibold">Extension (G / D)</span>
+              <div className="flex gap-2">
+                <input type="number" value={extG} onChange={(e) => setExtG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+                <input type="number" value={extD} onChange={(e) => setExtD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
               </div>
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(extG) === 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                {Number(extG) === 0 ? 'Validé' : 'Flessum'}
+              </span>
             </div>
 
+            <div className="flex items-center justify-between">
+              <span className="text-slate-700 font-semibold">Flexion (G / D)</span>
+              <div className="flex gap-2">
+                <input type="number" value={flexG} onChange={(e) => setFlexG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+                <input type="number" value={flexD} onChange={(e) => setFlexD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+              </div>
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(flexG) >= 120 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                {Number(flexG) >= 120 ? 'Validé' : 'Non-Validé'}
+              </span>
+            </div>
+          </div>
+
+          {/* Cicatrice */}
+          <div className="bg-slate-50 p-3.5 rounded-xl space-y-2.5">
+            <p className="font-bold text-slate-800">État Cicatriciel</p>
+            <div className="space-y-2">
+              <select value={cicatriceTrophicite} onChange={(e) => setCicatriceTrophicite(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold">
+                <option value="Normotrophique">Normotrophique</option>
+                <option value="Inflammatoire">Inflammatoire</option>
+                <option value="Hypertrophique">Hypertrophique</option>
+                <option value="Chéloïde">Chéloïde</option>
+              </select>
+              <select value={cicatriceAdherence} onChange={(e) => setCicatriceAdherence(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold">
+                <option value="Souple et mobile">Souple & mobile</option>
+                <option value="Adhérence superficielle">Adhérence superficielle</option>
+                <option value="Adhérence profonde">Adhérence profonde</option>
+              </select>
+              <select value={cicatriceSensibilite} onChange={(e) => setCicatriceSensibilite(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold">
+                <option value="Indolore">Indolore</option>
+                <option value="Douloureuse">Douloureuse</option>
+                <option value="Hypoesthésie">Hypoesthésie</option>
+              </select>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* BLOC 2 : Tests Fonctionnels */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-4">
-          <div className="flex items-center gap-3 border-b pb-3">
-            <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">2</span>
-            <h3 className="font-bold text-slate-800 text-base">Tests Fonctionnels & Dynamiques</h3>
-          </div>
+      {/* RANGÉE 2 : TESTS FONCTIONNELS (QUALITATIF & QUANTITATIF SÉPARÉS) */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-6">
+        <div className="flex items-center gap-3 border-b pb-3">
+          <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">2</span>
+          <h3 className="font-bold text-slate-800 text-base">Tests Fonctionnels & Dynamiques</h3>
+        </div>
 
-          <div className="space-y-3 text-xs">
-            <div className="grid grid-cols-4 gap-2 text-center font-bold text-slate-600 text-[10px]">
-              <span>Épreuve</span>
-              <span>Opéré </span>
-              <span>Sain</span>
-              <span>LSI %</span>
-            </div>
+        <div className="grid grid-cols-2 gap-8 items-start">
+          
+          {/* SOUS-BLOC A : TESTS QUALITATIFS (PLATEFORME DE FORCE / SQUAT & CMJ) */}
+          <div className="bg-slate-50 p-4 rounded-xl space-y-4">
+            <h4 className="font-extrabold text-amber-700 text-xs uppercase tracking-wider border-b border-amber-200 pb-2 flex justify-between items-center">
+              <span>A. Test Fonctionnel Qualitatif</span>
+              <span className="text-[10px] text-slate-500 font-normal">Plateforme / Force</span>
+            </h4>
 
             {/* Squat Bipodal */}
-            <div className="grid grid-cols-4 gap-2 items-center">
-              <span className="font-semibold text-slate-800">Squat Bipodal (N)</span>
-              <input type="number" value={squatG} onChange={(e) => setSquatG(e.target.value)} className="bg-slate-50 border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" />
-              <input type="number" value={squatD} onChange={(e) => setSquatD(e.target.value)} className="bg-slate-50 border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" />
-              <div className="text-center">{getLsiBadge(calcLSI(Number(squatG), Number(squatD)))}</div>
+            <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
+              <p className="font-bold text-slate-800 text-xs">Squat Bipodal</p>
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <span className="text-slate-600 font-semibold">Paramètre</span>
+                <span className="text-center font-bold text-slate-700">Gauche</span>
+                <span className="text-center font-bold text-slate-700">Droite</span>
+
+                <span>Peak Force Conc. (N)</span>
+                <input type="number" value={squatQual.peakConcG} onChange={(e) => setSquatQual({...squatQual, peakConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <input type="number" value={squatQual.peakConcD} onChange={(e) => setSquatQual({...squatQual, peakConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+
+                <span>Peak Force Exc. (N)</span>
+                <input type="number" value={squatQual.peakExcG} onChange={(e) => setSquatQual({...squatQual, peakExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <input type="number" value={squatQual.peakExcD} onChange={(e) => setSquatQual({...squatQual, peakExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+
+                <span>Mean Force Conc. (N)</span>
+                <input type="number" value={squatQual.meanConcG} onChange={(e) => setSquatQual({...squatQual, meanConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <input type="number" value={squatQual.meanConcD} onChange={(e) => setSquatQual({...squatQual, meanConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+
+                <span>Mean Force Exc. (N)</span>
+                <input type="number" value={squatQual.meanExcG} onChange={(e) => setSquatQual({...squatQual, meanExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <input type="number" value={squatQual.meanExcD} onChange={(e) => setSquatQual({...squatQual, meanExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                <span className="font-semibold text-slate-700">Hauteur de déplacement :</span>
+                <div className="flex items-center gap-1">
+                  <input type="number" value={squatQual.hauteurCm} onChange={(e) => setSquatQual({...squatQual, hauteurCm: e.target.value})} className="w-16 bg-slate-50 border rounded p-1 text-center font-bold" />
+                  <span className="font-bold text-slate-600">cm</span>
+                </div>
+              </div>
             </div>
 
-            {/* Side Hop 15s */}
-            <div className="grid grid-cols-4 gap-2 items-center">
-              <span className="font-semibold text-slate-800">Side Hop 15s (reps)</span>
-              <input type="number" value={side15G} onChange={(e) => setSide15G(e.target.value)} className="bg-slate-50 border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" />
-              <input type="number" value={side15D} onChange={(e) => setSide15D(e.target.value)} className="bg-slate-50 border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" />
-              <div className="text-center">{getLsiBadge(calcLSI(Number(side15G), Number(side15D)))}</div>
+            {/* CMJ (Countermovement Jump) */}
+            <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
+              <p className="font-bold text-slate-800 text-xs">CMJ (Countermovement Jump)</p>
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <span className="text-slate-600 font-semibold">Paramètre</span>
+                <span className="text-center font-bold text-slate-700">Gauche</span>
+                <span className="text-center font-bold text-slate-700">Droite</span>
+
+                <span>Impulsion Conc.</span>
+                <input type="number" value={cmj.impulsionConcG} onChange={(e) => setCmj({...cmj, impulsionConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <input type="number" value={cmj.impulsionConcD} onChange={(e) => setCmj({...cmj, impulsionConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+
+                <span>Force Freinage Exc.</span>
+                <input type="number" value={cmj.freinageExcG} onChange={(e) => setCmj({...cmj, freinageExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <input type="number" value={cmj.freinageExcD} onChange={(e) => setCmj({...cmj, freinageExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+
+                <span>Vitesse Freinage Exc.</span>
+                <input type="number" value={cmj.vitesseFreinG} onChange={(e) => setCmj({...cmj, vitesseFreinG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <input type="number" value={cmj.vitesseFreinD} onChange={(e) => setCmj({...cmj, vitesseFreinD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+
+                <span>Pic Force Réception</span>
+                <input type="number" value={cmj.picReceptionG} onChange={(e) => setCmj({...cmj, picReceptionG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <input type="number" value={cmj.picReceptionD} onChange={(e) => setCmj({...cmj, picReceptionD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                <span className="font-semibold text-slate-700">Hauteur du saut :</span>
+                <div className="flex items-center gap-1">
+                  <input type="number" value={cmj.hauteurSautCm} onChange={(e) => setCmj({...cmj, hauteurSautCm: e.target.value})} className="w-16 bg-slate-50 border rounded p-1 text-center font-bold" />
+                  <span className="font-bold text-slate-600">cm</span>
+                </div>
+              </div>
             </div>
 
-            {/* Side Hop 30s */}
-            <div className="grid grid-cols-4 gap-2 items-center">
-              <span className="font-semibold text-slate-800">Side Hop 30s (reps)</span>
-              <input type="number" value={side30G} onChange={(e) => setSide30G(e.target.value)} className="bg-slate-50 border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" />
-              <input type="number" value={side30D} onChange={(e) => setSide30D(e.target.value)} className="bg-slate-50 border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" />
-              <div className="text-center">{getLsiBadge(calcLSI(Number(side30G), Number(side30D)))}</div>
-            </div>
+          </div>
 
-            {/* Single Leg Hop */}
-            <div className="grid grid-cols-4 gap-2 items-center">
-              <span className="font-semibold text-slate-800">Single Leg Hop (cm)</span>
-              <input type="number" value={hopG} onChange={(e) => setHopG(e.target.value)} className="bg-slate-50 border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" />
-              <input type="number" value={hopD} onChange={(e) => setHopD(e.target.value)} className="bg-slate-50 border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" />
-              <div className="text-center">{getLsiBadge(calcLSI(Number(hopG), Number(hopD)))}</div>
+          {/* SOUS-BLOC B : TESTS QUANTITATIFS (HOP TESTS & AGILITÉ) */}
+          <div className="bg-slate-50 p-4 rounded-xl space-y-3">
+            <h4 className="font-extrabold text-amber-700 text-xs uppercase tracking-wider border-b border-amber-200 pb-2 flex justify-between items-center">
+              <span>B. Test Fonctionnel Quantitatif</span>
+              <span className="text-[10px] text-slate-500 font-normal">Sauts & Temps</span>
+            </h4>
+
+            <div className="space-y-2 text-[11px]">
+              <div className="grid grid-cols-4 gap-2 text-center font-bold text-slate-600 border-b pb-1">
+                <span className="text-left">Test Hop</span>
+                <span>Gauche</span>
+                <span>Droite</span>
+                <span>LSI %</span>
+              </div>
+
+              {[
+                { label: 'Single Leg Hop Test', keyG: 'singleLegG', keyD: 'singleLegD' },
+                { label: 'Triple Hop Test', keyG: 'tripleHopG', keyD: 'tripleHopD' },
+                { label: 'Crossover Hop Test', keyG: 'crossoverG', keyD: 'crossoverD' },
+                { label: 'Side Hop Test 15s', keyG: 'side15G', keyD: 'side15D' },
+                { label: 'Side Hop Test 30s', keyG: 'side30G', keyD: 'side30D' },
+                { label: 'Front Side Hop Test 30s', keyG: 'frontSide30G', keyD: 'frontSide30D' },
+                { label: 'Side Hop Test Modifié 15s', keyG: 'sideMod15G', keyD: 'sideMod15D' },
+                { label: 'Side Hop Test Modifié 30s', keyG: 'sideMod30G', keyD: 'sideMod30D' },
+                { label: 'Illinois Modifié (s)', keyG: 'illinoisModG', keyD: 'illinoisModD' },
+                { label: '6m Timed Hop Test (s)', keyG: 'timed6mG', keyD: 'timed6mD' },
+              ].map((item, idx) => (
+                <div key={idx} className="grid grid-cols-4 gap-2 items-center">
+                  <span className="font-semibold text-slate-800 text-[10px]">{item.label}</span>
+                  <input
+                    type="number"
+                    value={hopTests[item.keyG]}
+                    onChange={(e) => setHopTests({ ...hopTests, [item.keyG]: e.target.value })}
+                    className="bg-white border rounded p-1 text-center font-bold"
+                  />
+                  <input
+                    type="number"
+                    value={hopTests[item.keyD]}
+                    onChange={(e) => setHopTests({ ...hopTests, [item.keyD]: e.target.value })}
+                    className="bg-white border rounded p-1 text-center font-bold"
+                  />
+                  <div className="text-center">
+                    {getLsiBadge(calcLSI(hopTests[item.keyG], hopTests[item.keyD]))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
 
+        </div>
       </div>
 
-      {/* RANGÉE 2 : QUALITÉ DU MOUVEMENT */}
-{/* RANGÉE 2 : QUALITÉ DU MOUVEMENT (Analyse Step Down avec colonnes Gauche / Droite) */}
-<div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-4 text-slate-900">
-  <div className="flex items-center gap-3 border-b pb-3">
-    <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">3</span>
-    <h3 className="font-bold text-slate-800 text-base">Qualité du Mouvement (Analyse Fonctionnelle Latéral Step Down)</h3>
-  </div>
+      {/* RANGÉE 3 : BLOC QUALITÉ DU MOUVEMENT (LATERAL STEP DOWN + TABLEAU QASLS STRICT) */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-6 text-slate-900">
+        <div className="flex items-center gap-3 border-b pb-3">
+          <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">3</span>
+          <h3 className="font-bold text-slate-800 text-base">Qualité du Mouvement</h3>
+        </div>
 
-  <div className="grid grid-cols-2 gap-8 items-start text-xs">
-    {/* Anomalies observées en 2 colonnes distinctes : Gauche / Droite */}
-    <div className="bg-slate-50 p-4 rounded-xl space-y-3">
-      <p className="font-bold text-slate-800 border-b pb-2">Anomalies observées au Step Down</p>
-      
-      <div className="grid grid-cols-2 gap-6">
-        {/* Colonne Jambe Gauche */}
-        <div className="space-y-2.5">
-          <p className="font-extrabold text-slate-700 text-[11px] uppercase tracking-wider bg-slate-200/60 px-2 py-1 rounded text-center">
-            Jambe Gauche
-          </p>
-          <div className="space-y-2 pt-1">
-            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 hover:text-amber-600 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={qualite.pelvicDropGauche} 
-                onChange={(e) => setQualite({...qualite, pelvicDropGauche: e.target.checked})} 
-                className="accent-[#E5A73C] w-4 h-4 rounded" 
-              />
-              <span>Pelvic Drop</span>
-            </label>
+        {/* SECTION 1 : LATERAL STEP DOWN (GAUCHE / DROITE) */}
+        <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-200 text-xs">
+          <p className="font-bold text-slate-800 border-b pb-2">Latéral Step Down</p>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
+              <p className="font-extrabold text-slate-700 text-[10px] uppercase bg-slate-100 px-2 py-1 rounded text-center">Jambe Gauche</p>
+              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+                <input type="checkbox" checked={qualiteStepDown.pelvicDropG} onChange={(e) => setQualiteStepDown({...qualiteStepDown, pelvicDropG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
+                <span>Pelvic Drop</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+                <input type="checkbox" checked={qualiteStepDown.valgusG} onChange={(e) => setQualiteStepDown({...qualiteStepDown, valgusG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
+                <span>Valgus Dynamique</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+                <input type="checkbox" checked={qualiteStepDown.stiffLandingG} onChange={(e) => setQualiteStepDown({...qualiteStepDown, stiffLandingG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
+                <span>Stiff Landing</span>
+              </label>
+            </div>
 
-            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 hover:text-amber-600 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={qualite.valgusGauche} 
-                onChange={(e) => setQualite({...qualite, valgusGauche: e.target.checked})} 
-                className="accent-[#E5A73C] w-4 h-4 rounded" 
-              />
-              <span>Valgus Dynamique</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 hover:text-amber-600 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={qualite.stiffLandingGauche} 
-                onChange={(e) => setQualite({...qualite, stiffLandingGauche: e.target.checked})} 
-                className="accent-[#E5A73C] w-4 h-4 rounded" 
-              />
-              <span>Stiff Landing</span>
-            </label>
+            <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
+              <p className="font-extrabold text-slate-700 text-[10px] uppercase bg-slate-100 px-2 py-1 rounded text-center">Jambe Droite</p>
+              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+                <input type="checkbox" checked={qualiteStepDown.pelvicDropD} onChange={(e) => setQualiteStepDown({...qualiteStepDown, pelvicDropD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
+                <span>Pelvic Drop</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+                <input type="checkbox" checked={qualiteStepDown.valgusD} onChange={(e) => setQualiteStepDown({...qualiteStepDown, valgusD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
+                <span>Valgus Dynamique</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+                <input type="checkbox" checked={qualiteStepDown.stiffLandingD} onChange={(e) => setQualiteStepDown({...qualiteStepDown, stiffLandingD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
+                <span>Stiff Landing</span>
+              </label>
+            </div>
           </div>
         </div>
 
-        {/* Colonne Jambe Droite */}
-        <div className="space-y-2.5">
-          <p className="font-extrabold text-slate-700 text-[11px] uppercase tracking-wider bg-slate-200/60 px-2 py-1 rounded text-center">
-            Jambe Droite
-          </p>
-          <div className="space-y-2 pt-1">
-            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 hover:text-amber-600 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={qualite.pelvicDropDroit} 
-                onChange={(e) => setQualite({...qualite, pelvicDropDroit: e.target.checked})} 
-                className="accent-[#E5A73C] w-4 h-4 rounded" 
-              />
-              <span>Pelvic Drop</span>
-            </label>
+        {/* SECTION 2 : SINGLE LEG LANDING & GRILLE QASLS MOT POUR MOT */}
+        <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200 text-xs">
+          <div className="flex items-center justify-between border-b pb-2">
+            <div>
+              <p className="font-extrabold text-slate-800 text-xs">Single Leg Landing : nombre d'erreurs (QASLS)</p>
+              <p className="text-[10px] text-slate-500">Qualitative Assessment of Single-Leg Loading System</p>
+            </div>
 
-            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 hover:text-amber-600 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={qualite.valgusDroit} 
-                onChange={(e) => setQualite({...qualite, valgusDroit: e.target.checked})} 
-                className="accent-[#E5A73C] w-4 h-4 rounded" 
-              />
-              <span>Valgus Dynamique</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 hover:text-amber-600 transition-colors">
-              <input 
-                type="checkbox" 
-                checked={qualite.stiffLandingDroit} 
-                onChange={(e) => setQualite({...qualite, stiffLandingDroit: e.target.checked})} 
-                className="accent-[#E5A73C] w-4 h-4 rounded" 
-              />
-              <span>Stiff Landing</span>
-            </label>
+            {/* Total d'erreurs calculé automatiquement */}
+            <div className="flex gap-3">
+              <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-3 py-1 rounded-lg text-[11px]">
+                TOTAL Erreurs Gauche : <span className="text-slate-950 font-black">{calcTotalQasls('G')}</span>
+              </span>
+              <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-3 py-1 rounded-lg text-[11px]">
+                TOTAL Erreurs Droite : <span className="text-slate-950 font-black">{calcTotalQasls('D')}</span>
+              </span>
+            </div>
           </div>
+
+          {/* TABLEAU QASLS STRICTEMENT CONFORME À LA CAPTURE D'ÉCRAN */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px] text-left border-collapse bg-white rounded-lg border border-slate-300">
+              <thead>
+                <tr className="border-b text-slate-800 font-extrabold bg-slate-200/80">
+                  <th className="p-2 border-r w-1/4">Domaine d'Analyse</th>
+                  <th className="p-2 border-r">QASLS - Erreurs à cocher</th>
+                  <th className="p-2 text-center w-20 border-r">Gauche</th>
+                  <th className="p-2 text-center w-20">Droite</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {/* Utilisation des bras */}
+                <tr>
+                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50">Utilisation des bras</td>
+                  <td className="p-2 border-r font-medium">Mouvement excessif des bras</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.mouvementExcessifBrasG} onChange={(e)=>setQasls({...qasls, mouvementExcessifBrasG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.mouvementExcessifBrasD} onChange={(e)=>setQasls({...qasls, mouvementExcessifBrasD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+
+                {/* Alignement du buste */}
+                <tr className="bg-slate-50/30">
+                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50">Alignement du buste</td>
+                  <td className="p-2 border-r font-medium">Incliné dans différentes positions</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.inclinePositionsG} onChange={(e)=>setQasls({...qasls, inclinePositionsG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.inclinePositionsD} onChange={(e)=>setQasls({...qasls, inclinePositionsD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+
+                {/* Niveau du Bassin */}
+                <tr>
+                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Niveau du Bassin</td>
+                  <td className="p-2 border-r font-medium">Perte du plan horizontal</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.pertePlanHorizontalG} onChange={(e)=>setQasls({...qasls, pertePlanHorizontalG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.pertePlanHorizontalD} onChange={(e)=>setQasls({...qasls, pertePlanHorizontalD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+                <tr>
+                  <td className="p-2 border-r font-medium">Bascule ou rotation</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.basculeOuRotationG} onChange={(e)=>setQasls({...qasls, basculeOuRotationG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.basculeOuRotationD} onChange={(e)=>setQasls({...qasls, basculeOuRotationD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+
+                {/* Mouvement de la cuisse */}
+                <tr className="bg-slate-50/30">
+                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Mouvement de la cuisse</td>
+                  <td className="p-2 border-r font-medium">Abduction de hance</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.abductionHancheG} onChange={(e)=>setQasls({...qasls, abductionHancheG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.abductionHancheD} onChange={(e)=>setQasls({...qasls, abductionHancheD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+                <tr className="bg-slate-50/30">
+                  <td className="p-2 border-r font-medium">Position neutre cuisse controlatérale non maintenue</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.positionNeutreNonMaintenueG} onChange={(e)=>setQasls({...qasls, positionNeutreNonMaintenueG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.positionNeutreNonMaintenueD} onChange={(e)=>setQasls({...qasls, positionNeutreNonMaintenueD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+
+                {/* Position du genou */}
+                <tr>
+                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Position du genou</td>
+                  <td className="p-2 border-r font-medium">Rotule orientée vers le 2ième orteils</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.rotule2emeOrteilG} onChange={(e)=>setQasls({...qasls, rotule2emeOrteilG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.rotule2emeOrteilD} onChange={(e)=>setQasls({...qasls, rotule2emeOrteilD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+                <tr>
+                  <td className="p-2 border-r font-medium">Rotule orientée vers l'intérieur du pied</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.rotuleInterieurPiedG} onChange={(e)=>setQasls({...qasls, rotuleInterieurPiedG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.rotuleInterieurPiedD} onChange={(e)=>setQasls({...qasls, rotuleInterieurPiedD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+
+                {/* Stabilité de la posture */}
+                <tr className="bg-slate-50/30">
+                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Stabilité de la posture</td>
+                  <td className="p-2 border-r font-medium">Rééquilibrer avec l'autre jambe</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.reequilibrerAutreJambeG} onChange={(e)=>setQasls({...qasls, reequilibrerAutreJambeG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.reequilibrerAutreJambeD} onChange={(e)=>setQasls({...qasls, reequilibrerAutreJambeD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+                <tr className="bg-slate-50/30">
+                  <td className="p-2 border-r font-medium">La jambe de reception vacille</td>
+                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.jambeReceptionVacilleG} onChange={(e)=>setQasls({...qasls, jambeReceptionVacilleG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2"><input type="checkbox" checked={qasls.jambeReceptionVacilleD} onChange={(e)=>setQasls({...qasls, jambeReceptionVacilleD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                </tr>
+
+                {/* TOTAL ERREURS */}
+                <tr className="bg-slate-200/80 font-extrabold text-slate-900 border-t-2 border-slate-300">
+                  <td className="p-2.5 border-r" colSpan="2">TOTAL Erreurs</td>
+                  <td className="text-center p-2 border-r text-amber-900 font-black text-xs">{calcTotalQasls('G')}</td>
+                  <td className="text-center p-2 text-amber-900 font-black text-xs">{calcTotalQasls('D')}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* CAPTURES PHOTOS (2 PHOTOS : FACE JAMBE GAUCHE, FACE JAMBE DROITE) */}
+          <div className="pt-2">
+            <p className="font-bold text-slate-800 text-[11px] mb-2">+ 2 photos: face jambe gauche, face jambe droite :</p>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="border-2 border-dashed border-slate-300 rounded-xl p-3 h-32 flex flex-col items-center justify-center bg-white cursor-pointer hover:bg-slate-100 transition-colors relative overflow-hidden">
+                {photoG ? (
+                  <img src={photoG} alt="Face Jambe Gauche" className="h-full w-full object-cover rounded-lg" />
+                ) : (
+                  <>
+                    <span className="text-2xl">📷</span>
+                    <span className="text-xs font-bold text-slate-700 mt-1.5">Face Jambe Gauche</span>
+                    <span className="text-[10px] text-slate-400">Importer la photo</span>
+                  </>
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(e, 'G')} />
+              </label>
+
+              <label className="border-2 border-dashed border-slate-300 rounded-xl p-3 h-32 flex flex-col items-center justify-center bg-white cursor-pointer hover:bg-slate-100 transition-colors relative overflow-hidden">
+                {photoD ? (
+                  <img src={photoD} alt="Face Jambe Droite" className="h-full w-full object-cover rounded-lg" />
+                ) : (
+                  <>
+                    <span className="text-2xl">📷</span>
+                    <span className="text-xs font-bold text-slate-700 mt-1.5">Face Jambe Droite</span>
+                    <span className="text-[10px] text-slate-400">Importer la photo</span>
+                  </>
+                )}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(e, 'D')} />
+              </label>
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
 
-    {/* Galerie de photos Step Down (Face / Profil) */}
-    <div className="grid grid-cols-4 gap-2 text-center h-full items-center">
-      {['Face - Sain', 'Face - Opéré', 'Profil - Sain', 'Profil - Opéré'].map((title, i) => (
-        <div key={i} className="border-2 border-dashed border-slate-300 rounded-xl p-3 h-32 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors">
-          <span className="text-xl">📷</span>
-          <span className="text-[10px] font-bold text-slate-700 mt-1.5">{title}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-</div>
-
-      {/* RANGÉE 3 : BILAN VALD PROFILING N/kg (AVEC CIBLE 3M RESTAURÉE) */}
+      {/* RANGÉE 4 : BILAN VALD PROFILING N/kg */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-4">
         <div className="flex items-center justify-between border-b pb-3">
           <div className="flex items-center gap-3">
@@ -506,7 +706,7 @@ export default function BilanFormView() {
         </table>
       </div>
 
-      {/* RANGÉE 4 : PLAN D'ACTION GÉNÉRÉ AUTOMATIQUEMENT */}
+      {/* RANGÉE 5 : PLAN D'ACTION GÉNÉRÉ AUTOMATIQUEMENT */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-3">
         <h3 className="font-extrabold text-slate-800 text-base">Plan d'Action & Directives de Rééducation (Rédigé automatiquement)</h3>
         <p className="text-xs text-slate-500 font-medium">Ce texte est généré selon les règles métier et reste modifiable avant l'export PDF :</p>
@@ -517,7 +717,7 @@ export default function BilanFormView() {
           defaultValue={
             `1. Priorité au renforcement du quadriceps, du soléaire et à la réduction de l'asymétrie.\n` +
             `2. Poursuivre le travail de symétrie de force pour les ischios-jambiers, moyens fessiers et adducteurs.\n` +
-            `3. Présence de Pelvic Drop et Valgus dynamique sur la jambe opérée lors du Latéral Step Down.\n` +
+            `3. Présence de Pelvic Drop et Valgus dynamique lors du Latéral Step Down et score QASLS à surveiller.\n` +
             `4. Vigilance sur la confiance du patient en sa rééducation (ACL-RSI < 60%).`
           }
         />
