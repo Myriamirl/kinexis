@@ -1,4 +1,4 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
@@ -11,17 +11,15 @@ const getStoragePath = () => {
 };
 
 const dbPath = path.join(getStoragePath(), 'kinexis_database.db');
-const db = new sqlite3.Database(dbPath);
+const db = new Database(dbPath);
 
 function initDatabase() {
-    const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
-    db.exec(schemaSql, (err) => {
-        if (err) {
-            console.error('Erreur initialisation BDD :', err);
-        } else {
-            console.log('Base de données Kinexis initialisée avec succès.');
-        }
-    });
+    const schemaPath = path.join(__dirname, 'schema.sql');
+    if (fs.existsSync(schemaPath)) {
+        const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
+        db.exec(schemaSql);
+        console.log('Base de données Kinexis initialisée avec succès.');
+    }
 }
 
 initDatabase();

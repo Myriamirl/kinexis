@@ -2,113 +2,85 @@
  * ENGINE DE RÈGLES CLINIQUES & CALCULS AUTOMATIQUES - KINEXIS
  */
 
-// ============================================================================
-//   CALCULS MATHÉMATIQUES & CLINIQUES
-// ============================================================================
-
-/**
- * Calcul du LSI (Limb Symmetry Index) en %
- * Formule : (Valeur Membre Opéré / Valeur Membre Sain) * 100
- */
 function calculerLSI(valeurOpere, valeurSain) {
-    if (!valeurSain || valeurSain === 0 || !valeurOpere) return null;
-    const lsi = (valeurOpere / valeurSain) * 100;
-    const ecart = Math.round(lsi - 100); // Ex: -28%
-    return {
-        lsiPercent: Math.round(lsi),
-        ecartPercent: ecart,
-        formatted: `${ecart > 0 ? '+' : ''}${ecart}%`
-    };
+    if (!valeurSain || Number(valeurSain) === 0 || !valeurOpere) return 0;
+    return Math.round((Number(valeurOpere) / Number(valeurSain)) * 100) - 100;
 }
 
-/**
- * Calcul de la force relative en N/kg
- * Formule : Force en Newtons / Poids en kg
- */
 function calculerForceRelative(forceNewtons, poidsKg) {
-    if (!forceNewtons || !poidsKg || poidsKg === 0) return null;
-    return parseFloat((forceNewtons / poidsKg).toFixed(1)); // Ex: 5.5 N/kg
+    if (!forceNewtons || !poidsKg || poidsKg === 0) return 0;
+    return parseFloat((forceNewtons / poidsKg).toFixed(1));
 }
 
-/**
- * Détermination de la pastille de couleur pour les forces VALD
- */
-function determinerStatutForce(valeurNkg, cibleNkg, lsiPercent) {
-    if (!valeurNkg || !cibleNkg) return 'neutre';
-    
-    // Si la cible N/kg est atteinte et l'asymétrie < 10%
-    if (valeurNkg >= cibleNkg && lsiPercent >= 90) {
-        return 'vert';
-    } 
-    // Si proche de la cible (à 15% près)
-    else if (valeurNkg >= cibleNkg * 0.85 && lsiPercent >= 80) {
-        return 'orange';
-    } 
-    // Déficit marqué
-    else {
-        return 'rouge';
-    }
-}
-
-// ============================================================================
-//    GÉNÉRATION AUTOMATIQUE DU PLAN D'ACTION (SYNTHÈSE)
-// ============================================================================
-
-/**
- * Génère le texte rédigé du plan d'action en fonction des résultats du bilan
- */
-function genererPlanAction(donneesBilan, patient) {
+function genererDirectives(donneesBilan, patient, cibles3M = { quad: 5.5, ischio: 4.0, soleaire: 15.0, fessier: 5.0, adducteur: 5.0 }) {
     const recommandations = [];
+    
+    // Supporte à la fois patient.poids (depuis le front React) et patient.poids_kg (depuis SQLite)
+    const poidsPatient = patient?.poids || patient?.poids_kg || 0;
 
-    // Analyse ACL-RSI (Confiance)
-    const aclRsi = donneesBilan.acl_rsi_percent;
-    if (aclRsi !== undefined && aclRsi < 60) {
-        recommandations.push(
-            `Vigilance sur la confiance du patient (ACL-RSI à ${aclRsi}%, cible > 60%). Appréhension à prendre en compte dans la progression des charges.`
-        );
+    // ACL-RSI (Confiance psychologique)
+    const aclRsi = Number(donneesBilan.aclRsi);
+    if (aclRsi < 30) {
+        recommandations.push("Appréhension psychologique majeure. Accompagnement spécifique recommandé avant tout retour de la course à pied et du sport.");
+    } else if (aclRsi < 60) {
+        recommandations.push(`Vigilance sur la confiance du patient en sa rééducation (ACL-RSI à ${aclRsi}%, cible > 60%).`);
+    } else if (aclRsi > 75) {
+        recommandations.push("Excellente préparation psychologique (vigilance sur le surdimensionnement de la confiance).");
     }
 
-    // Mobilité & Séquelles
-    if (donneesBilan.ami_vaste_medial === 'Non-Validé') {
-        recommandations.push(
-            `Contraction : Attention à l'Inhibition Musculaire Arthrogène (AMI) sur le vaste médial. Reprogrammation neuro-musculaire prioritaire.`
-        );
+    // Flessum & AMI Vaste Médial
+    if (Number(donneesBilan.extG) > 0 || Number(donneesBilan.extD) > 0) {
+        const flessumG = Number(donneesBilan.extG);
+        if (flessumG > 10) {
+            recommandations.push(`Flessum persistant important (${flessumG}°). Boiterie à la marche et schéma moteur altéré. Nécessite un travail intensif de posture en extension et verrouillage actif du quadriceps.`);
+        } else if (flessumG > 0) {
+            recommandations.push(`Flessum résiduel significatif (${flessumG}°). Déficit d'extension limitant le déroulé du pas. Axer le traitement sur le gain d'extension passive et la levée de tension des ischio-jambiers.`);
+        }
     }
 
-    //Force Musculaire (VALD) & Asymétries
-    const quadLsi = donneesBilan.lsi_quadriceps;
-    if (quadLsi && quadLsi < 85) {
-        recommandations.push(
-            `Renforcement musculaire : Accentuer le travail analytique du quadriceps gauche/droit pour réduire l'asymétrie (LSI actuel : ${quadLsi}%).`
-        );
+    if (Number(donneesBilan.vasteG) < 80 && donneesBilan.vasteG !== '') {
+        recommandations.push("Activation du quadriceps insuffisante (AMI sévère) : privilégier le recrutement volontaire du vaste médial et le contrôle de la contraction, avec biofeedback.");
     }
 
-    const ischioLsi = donneesBilan.lsi_ischios;
-    if (ischioLsi && ischioLsi < 85) {
-        recommandations.push(
-            `Ischio-jambiers : Déficit de force identifié. Renforcer le travail excentrique et en course externe.`
-        );
-    }
+    // Regroupement dynamique VALD
+    const groupesMusculaires = [
+        { key: 'quad', label: 'quadriceps', article: 'du' },
+        { key: 'ischio', label: 'ischio-jambiers', article: 'des' },
+        { key: 'soleaire', label: 'soléaire', article: 'du' },
+        { key: 'fessier', label: 'moyens fessiers', article: 'des' },
+        { key: 'adducteur', label: 'adducteurs', article: 'des' }
+    ];
 
-    // 4. Reprise de la course à pied
-    const courseValidee = donneesBilan.aptitude_course === 'Validé';
-    if (!courseValidee) {
-        recommandations.push(
-            `Reprise Course à pied : Tests de force et/ou sauts non validés. Aptitude non validée ce jour. Accentuer le travail de biomécanique et de poussée.`
-        );
-    } else {
-        recommandations.push(
-            `Reprise Course à pied : Critères validés. Débuter le continuum de course de manière progressive sur terrain meuble.`
-        );
-    }
+    const casGroupes = { 1: [], 2: [], 3: [], 4: [] };
 
-    // Formatage des points numérotés
-    return recommandations.map((rec, index) => `${index + 1}. ${rec}`).join('\n\n');
+    groupesMusculaires.forEach(g => {
+        if (donneesBilan.vald && donneesBilan.vald[`${g.key}G`]) {
+            const forceOp = calculerForceRelative(donneesBilan.vald[`${g.key}G`], poidsPatient);
+            const forceSain = calculerForceRelative(donneesBilan.vald[`${g.key}D`], poidsPatient);
+            const cible = cibles3M[g.key] || 5.0;
+
+            const cibleAtteinte = forceOp >= cible;
+            const lsiAbs = Math.abs(calculerLSI(forceOp, forceSain));
+            const asymetrieElevée = lsiAbs > 20;
+
+            if (!cibleAtteinte && asymetrieElevée) casGroupes[1].push(g);
+            else if (!cibleAtteinte && !asymetrieElevée) casGroupes[2].push(g);
+            else if (cibleAtteinte && asymetrieElevée) casGroupes[3].push(g);
+            else casGroupes[4].push(g);
+        }
+    });
+
+    const formatList = (list) => list.map(m => `${m.article} ${m.label}`).join(', ');
+
+    if (casGroupes[1].length > 0) recommandations.push(`Priorité au renforcement ${formatList(casGroupes[1])} et à la réduction de l'asymétrie.`);
+    if (casGroupes[2].length > 0) recommandations.push(`Poursuivre le développement de la force ${formatList(casGroupes[2])} pour atteindre la cible.`);
+    if (casGroupes[3].length > 0) recommandations.push(`Poursuivre le travail de symétrie de force ${formatList(casGroupes[3])}.`);
+
+    return recommandations.map((rec, idx) => `${idx + 1}. ${rec}`).join('\n\n');
 }
 
 module.exports = {
     calculerLSI,
     calculerForceRelative,
-    determinerStatutForce,
-    genererPlanAction
+    genererDirectives
 };

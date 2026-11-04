@@ -1,26 +1,56 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-export default function HomeView({ onNavigate, onStartBilan }) {
-  const patientsRecents = [
-    { initials: 'MD', nom: 'DUPONT Michelle', date: '12/04/1999', id: '00124', dernierBilan: '14/10/2026' },
-    { initials: 'LB', nom: 'LEFEBVRE Bastien', date: '12/07/1951', id: '00027', dernierBilan: '25/09/2026' },
-    { initials: 'CM', nom: 'MOREAU Camille', date: '16/11/1981', id: '00442', dernierBilan: '16/09/2026' },
-  ];
+const { ipcRenderer } = window.require ? window.require('electron') : {};
 
-  const bilansRecents = [
-    { patient: 'DUPONT Michelle', type: 'Post-LCA (3 mois)', statut: null },
-    { patient: 'LEFEBVRE Bastien', type: 'Membre inférieur', statut: 'A analyser' },
-    { patient: 'MOREAU Camille', type: 'Post-LCA (3 mois)', statut: 'En cours' },
-    { patient: 'ROUSSEL Thomas', type: 'Bilan fonctionnel', statut: 'Validé' },
-  ];
+export default function HomeView({ currentKine, onNavigate }) {
+  const [patientsRecents, setPatientsRecents] = useState([]);
+  const [bilansRecents, setBilansRecents] = useState([]);
+  const [recherche, setRecherche] = useState('');
+
+  useEffect(() => {
+    if (ipcRenderer) {
+      // Récupération des patients actifs depuis la BDD SQLite
+      ipcRenderer.invoke('patients:get-actifs')
+        .then((data) => {
+          if (data) {
+            // Prendre les 4 derniers enregistrés
+            const formatted = data.slice(0, 4).map(p => ({
+              id: p.id,
+              initials: `${p.nom ? p.nom[0] : ''}${p.prenom ? p.prenom[0] : ''}`.toUpperCase(),
+              nom: `${p.nom} ${p.prenom}`,
+              date: p.date_naissance || 'Non renseignée',
+              idFormatted: String(p.id).padStart(5, '0'),
+              dernierBilan: 'Bilan récent'
+            }));
+            setPatientsRecents(formatted);
+          }
+        })
+        .catch(err => console.error("Erreur chargement patients accueil :", err));
+
+      // Récupération des bilans récents (s'il y a un handler ou simulation)
+      ipcRenderer.invoke('bilans:get-recents')
+        .then((data) => {
+          if (data) setBilansRecents(data);
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  const patientsFiltres = patientsRecents.filter(p =>
+    p.nom.toLowerCase().includes(recherche.toLowerCase())
+  );
 
   return (
-    <div className="space-y-6 w-full h-full flex flex-col">
-      {/* En-tête */}
+    <div className="space-y-6 w-full h-full flex flex-col text-slate-900">
+      {/* En-tête Dynamique avec Prénom du Kiné */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-extrabold text-[#1E293B]">Interface de Marion,</h2>
-          <p className="text-base text-slate-500 font-medium">Bienvenue dans votre espace</p>
+          <h2 className="text-3xl font-extrabold text-[#1E293B]">
+            Interface de {currentKine?.prenom || 'Praticien'},
+          </h2>
+          <p className="text-base text-slate-500 font-medium">
+            Bienvenue dans votre espace {currentKine?.specialite ? `• ${currentKine.specialite}` : ''}
+          </p>
         </div>
 
         <div className="flex items-center gap-4">
@@ -28,8 +58,10 @@ export default function HomeView({ onNavigate, onStartBilan }) {
             <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">🔍</span>
             <input
               type="text"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
               placeholder="Rechercher un patient..."
-              className="bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 w-72 shadow-sm"
+              className="bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 w-72 shadow-sm font-semibold"
             />
           </div>
           <button 
@@ -44,9 +76,9 @@ export default function HomeView({ onNavigate, onStartBilan }) {
       {/* Trait de séparation doré */}
       <div className="h-1 bg-gradient-to-r from-[#E5A73C] via-[#E5A73C]/50 to-transparent rounded-full"></div>
 
-      {/* Cartes en responsive full width */}
+      {/* Cartes responsive */}
       <div className="grid grid-cols-2 gap-8 flex-1 items-start">
-        {/* Patients récents */}
+        {/* Patients récents depuis BDD */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60">
           <div className="flex items-center gap-2.5 mb-5">
             <span className="text-slate-700 text-lg">👤</span>
@@ -54,26 +86,30 @@ export default function HomeView({ onNavigate, onStartBilan }) {
           </div>
 
           <div className="divide-y divide-slate-100">
-            {patientsRecents.map((p, idx) => (
-              <div key={idx} className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-full bg-[#1E293B] text-white font-extrabold text-sm flex items-center justify-center">
-                    {p.initials}
+            {patientsFiltres.length === 0 ? (
+              <p className="text-xs text-slate-400 py-4 font-semibold text-center">Aucun patient trouvé en BDD.</p>
+            ) : (
+              patientsFiltres.map((p, idx) => (
+                <div key={idx} className="flex items-center justify-between py-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-11 h-11 rounded-full bg-[#1E293B] text-white font-extrabold text-sm flex items-center justify-center">
+                      {p.initials}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{p.nom}</p>
+                      <p className="text-xs text-slate-400">Date de naissance : {p.date} • ID : {p.idFormatted}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-800 text-sm">{p.nom}</p>
-                    <p className="text-xs text-slate-400">Date de naissance : {p.date} • ID : {p.id}</p>
+                  <div className="text-right flex items-center gap-4">
+                    <div>
+                      <p className="text-xs text-slate-400">Dernier bilan</p>
+                      <p className="text-xs font-bold text-slate-700">{p.dernierBilan}</p>
+                    </div>
+                    <span className="text-slate-400 text-lg font-bold">›</span>
                   </div>
                 </div>
-                <div className="text-right flex items-center gap-4">
-                  <div>
-                    <p className="text-xs text-slate-400">Dernier bilan</p>
-                    <p className="text-xs font-bold text-slate-700">{p.dernierBilan}</p>
-                  </div>
-                  <span className="text-slate-400 text-lg font-bold">›</span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -93,23 +129,25 @@ export default function HomeView({ onNavigate, onStartBilan }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {bilansRecents.map((b, idx) => (
-                <tr key={idx}>
-                  <td className="py-4 font-semibold text-slate-800">{b.patient}</td>
-                  <td className="py-4 text-slate-500 text-xs font-medium">{b.type}</td>
-                  <td className="py-4 text-right">
-                    {b.statut === 'A analyser' && (
-                      <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-rose-100 text-rose-600 border border-rose-200">⚠️ A analyser</span>
-                    )}
-                    {b.statut === 'En cours' && (
-                      <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">En cours</span>
-                    )}
-                    {b.statut === 'Validé' && (
-                      <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">✓ Validé</span>
-                    )}
+              {bilansRecents.length === 0 ? (
+                <tr>
+                  <td colSpan="3" className="py-6 text-center text-xs text-slate-400 font-semibold">
+                    Aucun bilan enregistré pour le moment.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                bilansRecents.map((b, idx) => (
+                  <tr key={idx}>
+                    <td className="py-4 font-semibold text-slate-800">{b.patientNom}</td>
+                    <td className="py-4 text-slate-500 text-xs font-medium">{b.typeBilan || 'Post-LCA'}</td>
+                    <td className="py-4 text-right">
+                      <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        ✓ Validé
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

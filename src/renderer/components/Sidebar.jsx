@@ -1,73 +1,110 @@
 import React from 'react';
 
-export default function Sidebar({ currentView, setCurrentView }) {
-  const menuItems = [
-    { id: 'home', label: 'Accueil', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 00-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-    )},
-    { id: 'patients', label: 'Patients', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-    )},
-    { id: 'bilan', label: 'Nouveau bilan', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-    )},
-    { id: 'settings', label: 'Paramètres', icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
-    )}
-  ];
-
+export default function Sidebar({ currentView, setCurrentView, currentKine, onLogout, onLoginClick }) {
   return (
-    <aside className="w-64 bg-[#0F224A] flex flex-col justify-between p-5 h-full select-none shrink-0 border-r border-slate-800">
-      <div>
-        {/* Logo app + Titre Kinexis */}
-        <div className="flex items-center gap-3 px-1 py-3 mb-8">
-          <img 
-            src="/img/logo_app.png" 
-            alt="CKS Kinexis" 
-            className="w-20 h-20 object-contain"
-            onError={(e) => { e.target.onerror = null; e.target.src = "/img/logo_app.png"; }}
-          />
-          <h1 className="text-3xl font-black tracking-tight text-white font-sans">Kinexis</h1>
+    <aside className="w-64 bg-[#0F172A] text-slate-300 flex flex-col justify-between h-full p-6 shadow-xl border-r border-slate-800">
+      
+      {/* 1. LOGO & TITRE APPLICATION */}
+      <div className="space-y-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#E5A73C] rounded-2xl flex items-center justify-center text-slate-950 font-black text-xl shadow-lg">
+            K
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-white tracking-wider">
+              KIN<span className="text-[#E5A73C]">EXIS</span>
+            </h1>
+            <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">
+              CKS Trélazé
+            </p>
+          </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="space-y-2.5">
-          {menuItems.map((item) => {
-            const isActive = currentView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setCurrentView(item.id)}
-                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl font-bold text-sm transition-all text-left ${
-                  isActive
-                    ? 'bg-[#E5A73C] text-slate-950 shadow-md'
-                    : 'text-slate-300 hover:bg-[#193266] hover:text-white'
-                }`}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+        {/* 2. NAVIGATION PRINCIPALE */}
+        <nav className="space-y-2 text-xs font-bold">
+          <button
+            onClick={() => setCurrentView('home')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              currentView === 'home'
+                ? 'bg-[#E5A73C] text-slate-950 font-black shadow-md'
+                : 'hover:bg-slate-800/60 text-slate-400 hover:text-white'
+            }`}
+          >
+            <span className="text-base">🏠</span> Accueil
+          </button>
+
+          <button
+            onClick={() => setCurrentView('patients')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              currentView === 'patients'
+                ? 'bg-[#E5A73C] text-slate-950 font-black shadow-md'
+                : 'hover:bg-slate-800/60 text-slate-400 hover:text-white'
+            }`}
+          >
+            <span className="text-base">👥</span> Patients
+          </button>
+
+          <button
+            onClick={() => setCurrentView('bilan')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              currentView === 'bilan'
+                ? 'bg-[#E5A73C] text-slate-950 font-black shadow-md'
+                : 'hover:bg-slate-800/60 text-slate-400 hover:text-white'
+            }`}
+          >
+            <span className="text-base">📋</span> Nouveau Bilan
+          </button>
+
+          <button
+            onClick={() => setCurrentView('settings')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              currentView === 'settings'
+                ? 'bg-[#E5A73C] text-slate-950 font-black shadow-md'
+                : 'hover:bg-slate-800/60 text-slate-400 hover:text-white'
+            }`}
+          >
+            <span className="text-base">⚙️</span> Paramètres
+          </button>
         </nav>
       </div>
 
-      {/* Profil praticien & Déconnexion */}
-      <div className="pt-4 border-t border-[#1C376E]/60 space-y-4">
-        <div className="flex items-center gap-3 px-1">
-          <div className="w-10 h-10 rounded-full bg-slate-200 text-[#0F224A] font-extrabold text-sm flex items-center justify-center border-2 border-white">
-            M
-          </div>
-          <span className="text-sm font-bold text-white">Marion</span>
-        </div>
+      {/* 3. BAS DE SIDEBAR : PROFIL KINÉ + BOUTONS DYNAMIQUES */}
+      <div className="pt-6 border-t border-slate-800 space-y-4">
+        {currentKine ? (
+          /* CAS KINÉ CONNECTÉ */
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+              <div className="w-9 h-9 rounded-xl bg-[#E5A73C]/20 text-[#E5A73C] font-black text-xs flex items-center justify-center border border-[#E5A73C]/30">
+                {currentKine.prenom ? currentKine.prenom[0] : 'K'}{currentKine.nom ? currentKine.nom[0] : ''}
+              </div>
+              <div className="overflow-hidden text-left">
+                <p className="text-xs font-bold text-white truncate">
+                  {currentKine.prenom} {currentKine.nom}
+                </p>
+                <p className="text-[10px] text-slate-400 truncate">
+                  {currentKine.specialite || 'Praticien'}
+                </p>
+              </div>
+            </div>
 
-        <button 
-          onClick={() => alert('Déconnexion')}
-          className="w-full bg-[#E5A73C] hover:bg-[#d4962b] text-slate-950 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors shadow-sm"
-        >
-          Déconnexion
-        </button>
+            <button
+              onClick={onLogout}
+              className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <span>🚪</span> Déconnexion
+            </button>
+          </div>
+        ) : (
+          /* CAS KINÉ NON CONNECTÉ */
+          <button
+            onClick={onLoginClick}
+            className="w-full bg-[#E5A73C] hover:bg-[#d4962b] text-slate-950 font-black px-4 py-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+          >
+            <span>🔑</span> Se Connecter
+          </button>
+        )}
       </div>
+
     </aside>
   );
 }

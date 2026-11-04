@@ -1,26 +1,68 @@
 import React, { useState, useEffect } from 'react';
 
-export default function BilanFormView() {
-  const [patient] = useState({
-    nom: 'DUPONT Michelle',
-    id: '00124',
-    poids: 65,
-    taille: 178,
+// Accès au pont Electron IPC
+const { ipcRenderer } = window.require ? window.require('electron') : {};
+
+export default function BilanFormView({ currentKine }) {
+  // --- ÉTAT PATIENTS ET SÉLECTION DEPUIS SQLITE ---
+  const [patientsListe, setPatientsListe] = useState([]);
+  const [selectedPatientId, setSelectedPatientId] = useState('');
+  const [patient, setPatient] = useState({
+    id: null,
+    nom: '',
+    prenom: '',
+    poids: 0,
+    taille: 0,
     coteOpere: 'Gauche',
-    profilSportif: 'Pivot'
+    profilSportif: 'Amateur'
   });
 
-  // Gestion des dates et calcul dynamique du délai post-opératoire
+  // Chargement dynamique des patients au montage
+  useEffect(() => {
+    if (ipcRenderer) {
+      ipcRenderer.invoke('patients:get-actifs')
+        .then((data) => {
+          setPatientsListe(data);
+          if (data && data.length > 0) {
+            setSelectedPatientId(data[0].id);
+            updatePatientState(data[0]);
+          }
+        })
+        .catch((err) => console.error("Erreur récupération patients :", err));
+    }
+  }, []);
+
+  const updatePatientState = (pData) => {
+    setPatient({
+      id: pData.id,
+      nom: pData.nom || '',
+      prenom: pData.prenom || '',
+      poids: pData.poids_kg || 0,
+      taille: pData.taille_cm || 0,
+      coteOpere: pData.cote_opere || 'Gauche',
+      profilSportif: pData.profil_sportif || 'Amateur'
+    });
+  };
+
+  const handlePatientChange = (e) => {
+    const pId = Number(e.target.value);
+    setSelectedPatientId(pId);
+    const pFound = patientsListe.find(p => p.id === pId);
+    if (pFound) {
+      updatePatientState(pFound);
+    }
+  };
+
+  // --- DATES ET POST-OPÉRATOIRE ---
   const [dateBilan, setDateBilan] = useState(new Date().toISOString().split('T')[0]);
-  const [dateOperation, setDateOperation] = useState('2026-07-23');
-  const [delaiPostOp, setDelaiPostOp] = useState('');
+  const [dateOperation, setDateOperation] = useState('');
+  const [delaiPostOp, setDelaiPostOp] = useState('-');
 
   useEffect(() => {
     if (dateBilan && dateOperation) {
       const dBilan = new Date(dateBilan);
       const dOp = new Date(dateOperation);
-      const diffTime = dBilan - dOp;
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      const diffDays = Math.floor((dBilan - dOp) / (1000 * 60 * 60 * 24));
       
       if (diffDays < 0) {
         setDelaiPostOp("Date d'opération postérieure au bilan !");
@@ -28,84 +70,76 @@ export default function BilanFormView() {
         const moisExact = (diffDays / 30.4375).toFixed(1);
         setDelaiPostOp(`${moisExact} mois (${diffDays} jours)`);
       }
+    } else {
+      setDelaiPostOp('-');
     }
   }, [dateBilan, dateOperation]);
 
-  // BLOC 1 : MOBILITÉ & CONFIANCE
-  const [aclRsi, setAclRsi] = useState('18.33');
-  const [extG, setExtG] = useState('0');
-  const [extD, setExtD] = useState('0');
-  const [flexG, setFlexG] = useState('130');
-  const [flexD, setFlexD] = useState('150');
+  // --- MOBILITÉ & CONFIANCE (Champs vides) ---
+  const [aclRsi, setAclRsi] = useState('');
+  const [extG, setExtG] = useState('');
+  const [extD, setExtD] = useState('');
+  const [flexG, setFlexG] = useState('');
+  const [flexD, setFlexD] = useState('');
 
-  // Cicatrice détaillée
   const [cicatriceTrophicite, setCicatriceTrophicite] = useState('Normotrophique');
   const [cicatriceAdherence, setCicatriceAdherence] = useState('Souple et mobile');
   const [cicatriceSensibilite, setCicatriceSensibilite] = useState('Indolore');
 
-  // Vaste Médial
-  const [vasteG, setVasteG] = useState('80');
-  const [vasteD, setVasteD] = useState('200');
+  const [vasteG, setVasteG] = useState('');
+  const [vasteD, setVasteD] = useState('');
 
-  // BLOC 2A : TESTS FONCTIONNELS QUALITATIFS
+  // --- TESTS FONCTIONNELS QUALITATIFS (Champs vides) ---
   const [squatQual, setSquatQual] = useState({
-    peakConcG: '384', peakConcD: '468',
-    peakExcG: '320', peakExcD: '410',
-    meanConcG: '290', meanConcD: '350',
-    meanExcG: '250', meanExcD: '310',
-    hauteurCm: '42'
+    peakConcG: '', peakConcD: '',
+    peakExcG: '', peakExcD: '',
+    meanConcG: '', meanConcD: '',
+    meanExcG: '', meanExcD: '',
+    hauteurCm: ''
   });
 
   const [cmj, setCmj] = useState({
-    impulsionConcG: '120', impulsionConcD: '145',
-    freinageExcG: '210', freinageExcD: '260',
-    vitesseFreinG: '1.2', vitesseFreinD: '1.5',
-    picReceptionG: '850', picReceptionD: '980',
-    hauteurSautCm: '28'
+    impulsionConcG: '', impulsionConcD: '',
+    freinageExcG: '', freinageExcD: '',
+    vitesseFreinG: '', vitesseFreinD: '',
+    picReceptionG: '', picReceptionD: '',
+    hauteurSautCm: ''
   });
 
-  // BLOC 2B : TESTS FONCTIONNELS QUANTITATIFS (GAUCHE / DROITE)
+  // --- TESTS FONCTIONNELS QUANTITATIFS (Champs vides - 10 Tests) ---
   const [hopTests, setHopTests] = useState({
-    singleLegG: '114', singleLegD: '124',
-    tripleHopG: '340', tripleHopD: '380',
-    crossoverG: '310', crossoverD: '355',
-    side15G: '28', side15D: '32',
-    side30G: '50', side30D: '63',
-    frontSide30G: '45', frontSide30D: '55',
-    sideMod15G: '25', sideMod15D: '30',
-    sideMod30G: '48', sideMod30D: '58',
-    illinoisModG: '12.4', illinoisModD: '11.2',
-    timed6mG: '2.1', timed6mD: '1.8'
+    singleLegG: '', singleLegD: '',
+    tripleHopG: '', tripleHopD: '',
+    crossoverG: '', crossoverD: '',
+    side15G: '', side15D: '',
+    side30G: '', side30D: '',
+    frontSide30G: '', frontSide30D: '',
+    sideMod15G: '', sideMod15D: '',
+    sideMod30G: '', sideMod30D: '',
+    illinoisModG: '', illinoisModD: '',
+    timed6mG: '', timed6mD: ''
   });
 
-  // BLOC 3 : QUALITÉ DU MOUVEMENT (LATERAL STEP DOWN G/D)
+  // --- QUALITÉ DU MOUVEMENT (Décochés par défaut) ---
   const [qualiteStepDown, setQualiteStepDown] = useState({
-    pelvicDropG: true, pelvicDropD: false,
-    valgusG: true, valgusD: false,
+    pelvicDropG: false, pelvicDropD: false,
+    valgusG: false, valgusD: false,
     stiffLandingG: false, stiffLandingD: false
   });
 
-  // GRILLE EXACTE QASLS
   const [qasls, setQasls] = useState({
-    // Utilisation des bras
     mouvementExcessifBrasG: false, mouvementExcessifBrasD: false,
-    // Alignement du buste
-    inclinePositionsG: true, inclinePositionsD: false,
-    // Niveau du Bassin
-    pertePlanHorizontalG: true, pertePlanHorizontalD: false,
+    inclinePositionsG: false, inclinePositionsD: false,
+    pertePlanHorizontalG: false, pertePlanHorizontalD: false,
     basculeOuRotationG: false, basculeOuRotationD: false,
-    // Mouvement de la cuisse
-    abductionHancheG: true, abductionHancheD: false,
+    abductionHancheG: false, abductionHancheD: false,
     positionNeutreNonMaintenueG: false, positionNeutreNonMaintenueD: false,
-    // Position du genou
-    rotule2emeOrteilG: false, rotule2emeOrteilD: true,
-    rotuleInterieurPiedG: true, rotuleInterieurPiedD: false,
-    // Stabilité de la posture
-    reequilibrerAutreJambeG: true, reequilibrerAutreJambeD: false,
-    jambeReceptionVacilleG: true, jambeReceptionVacilleD: false
+    rotule2emeOrteilG: false, rotule2emeOrteilD: false,
+    rotuleInterieurPiedG: false, rotuleInterieurPiedD: false,
+    reequilibrerAutreJambeG: false, reequilibrerAutreJambeD: false,
+    jambeReceptionVacilleG: false, jambeReceptionVacilleD: false
   });
 
-  // Calcul dynamique du TOTAL Erreurs QASLS
   const calcTotalQasls = (side) => {
     const keys = side === 'G'
       ? ['mouvementExcessifBrasG', 'inclinePositionsG', 'pertePlanHorizontalG', 'basculeOuRotationG', 'abductionHancheG', 'positionNeutreNonMaintenueG', 'rotule2emeOrteilG', 'rotuleInterieurPiedG', 'reequilibrerAutreJambeG', 'jambeReceptionVacilleG']
@@ -120,37 +154,131 @@ export default function BilanFormView() {
   const handlePhotoUpload = (e, side) => {
     const file = e.target.files[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      if (side === 'G') setPhotoG(url);
-      else setPhotoD(url);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (side === 'G') setPhotoG(reader.result);
+        else setPhotoD(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  // BLOC 4 : BILAN DE FORCE VALD
+  // --- FORCE ISOMÉTRIQUE VALD (Champs vides - 6 Tests) ---
   const [vald, setVald] = useState({
-    quadG: 347, quadD: 480,
-    ischioG: 183, ischioD: 200,
-    soleaireG: 1130, soleaireD: 1311,
-    fessierG: 277, fessierD: 347,
-    adducteurG: 351, adducteurD: 384,
+    quadG: '', quadD: '',
+    ischioG: '', ischioD: '',
+    soleaireG: '', soleaireD: '',
+    fessierG: '', fessierD: '',
+    adducteurG: '', adducteurD: '',
   });
 
-  // Cibles minimales à 3 Mois
   const cibles3M = { quad: 5.5, ischio: 4.0, soleaire: 15.0, fessier: 5.0, adducteur: 5.0 };
-
-  // Cibles Sport selon le profil
   const ciblesSport = patient.profilSportif === 'Pivot'
     ? { quad: 8.5, ischio: 5.0, soleaire: 20.0, fessier: 6.0, adducteur: 6.0 }
     : { quad: 7.5, ischio: 4.5, soleaire: 18.0, fessier: 6.0, adducteur: 6.0 };
 
-  // Calculs automatiques
-  const calcRelative = (forceN) => (forceN / patient.poids).toFixed(1);
+  // --- RECALCUL AUTOMATIQUE DU PLAN D'ACTION ---
+  const [planActionText, setPlanActionText] = useState('');
+
+  useEffect(() => {
+    if (ipcRenderer && patient.id) {
+      const dataBilan = { aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald };
+      ipcRenderer.invoke('rules:calculer-texte', dataBilan, patient, cibles3M)
+        .then(text => setPlanActionText(text))
+        .catch(err => console.error("Erreur calcul règles :", err));
+    }
+  }, [aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald, patient, cibles3M]);
+
+  // --- SAUVEGARDE EN BASE SQLITE ---
+  const handleSaveBilan = async () => {
+    if (!patient.id) {
+      alert("Veuillez sélectionner un patient avant d'enregistrer.");
+      return;
+    }
+
+    if (!ipcRenderer) {
+      alert("Mode Web : Simulation d'enregistrement.");
+      return;
+    }
+
+    const payload = {
+      patientId: patient.id,
+      kineId: currentKine?.id || 1,
+      dataBilan: {
+        dateBilan,
+        dateOperation,
+        delaiPostOp,
+        aclRsi,
+        extG, extD, flexG, flexD,
+        cicatriceTrophicite, cicatriceAdherence, cicatriceSensibilite,
+        vasteG, vasteD,
+        squatQual,
+        cmj,
+        hopTests,
+        qualiteStepDown,
+        qasls,
+        vald,
+        planAction: planActionText
+      },
+      photos: { photoG, photoD }
+    };
+
+    const res = await ipcRenderer.invoke('bilans:save', payload);
+    if (res.success) {
+      alert(`✅ Bilan enregistré en BDD pour ${patient.nom} ${patient.prenom} (ID Bilan : ${res.bilanId})`);
+    } else {
+      alert(`❌ Erreur BDD : ${res.error}`);
+    }
+  };
+
+  // --- EXPORT PDF ---
+  const handleExportPdf = async () => {
+    await handleSaveBilan();
+
+    if (!ipcRenderer) {
+      alert("Génération PDF disponible via Electron.");
+      return;
+    }
+
+    const payload = {
+      patient: {
+        nom: `${patient.nom} ${patient.prenom}`,
+        coteOpere: patient.coteOpere,
+        poids: patient.poids
+      },
+      dataBilan: {
+        dateBilan,
+        dateOperation,
+        delaiPostOp,
+        aclRsi,
+        extG, extD, flexG, flexD,
+        vasteG, vasteD,
+        vald,
+        planAction: planActionText
+      }
+    };
+
+    const res = await ipcRenderer.invoke('pdf:generate', payload);
+    if (res.success) {
+      alert(`✅ Compte-rendu PDF généré et enregistré !`);
+    } else if (!res.cancelled) {
+      alert(`❌ Erreur PDF : ${res.error}`);
+    }
+  };
+
+  // Calculs dynamiques
+  const calcRelative = (forceN) => {
+    if (!forceN || !patient.poids || patient.poids === 0) return '-';
+    return (Number(forceN) / patient.poids).toFixed(1);
+  };
+
   const calcLSI = (forceOperee, forceSaine) => {
-    if (!forceSaine || Number(forceSaine) === 0) return 0;
+    if (!forceSaine || Number(forceSaine) === 0 || !forceOperee) return 0;
     return Math.round((Number(forceOperee) / Number(forceSaine)) * 100) - 100;
   };
 
   const getLsiBadge = (lsiAbs) => {
+    if (!lsiAbs && lsiAbs !== 0) return <span className="text-slate-400 font-normal">-</span>;
     if (Math.abs(lsiAbs) <= 10) return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white">{lsiAbs}%</span>;
     if (Math.abs(lsiAbs) <= 20) return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500 text-white">{lsiAbs}%</span>;
     return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500 text-white">{lsiAbs}%</span>;
@@ -158,26 +286,53 @@ export default function BilanFormView() {
 
   return (
     <div className="space-y-8 w-full h-full flex flex-col pb-12 text-slate-900">
-      {/* En-tête Bilan */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-extrabold text-[#1E293B]">Nouveau Bilan Post-LCA</h2>
-          <p className="text-sm text-slate-600 font-medium mt-1">
-            Patient: <span className="font-bold text-slate-900">{patient.nom}</span> • Côté Opéré: <span className="font-bold text-slate-900">{patient.coteOpere}</span> • Poids: <span className="font-bold text-slate-900">{patient.poids} kg</span>
-          </p>
+      
+      {/* EN-TÊTE DYNAMIQUE AVEC SELECTION PATIENT SQLITE */}
+      <div className="flex items-center justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-extrabold text-[#1E293B]">Nouveau Bilan Post-LCA</h2>
+          
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-bold text-slate-500">Patient :</span>
+            <select
+              value={selectedPatientId}
+              onChange={handlePatientChange}
+              className="bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-900 shadow-sm focus:outline-none focus:border-amber-500"
+            >
+              {patientsListe.length === 0 && <option value="">Aucun patient trouvé en BDD</option>}
+              {patientsListe.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nom} {p.prenom} (Poids: {p.poids_kg || '-'}kg)
+                </option>
+              ))}
+            </select>
+
+            {patient.id && (
+              <span className="text-xs font-semibold text-slate-600">
+                • Côté Opéré: <strong className="text-slate-900">{patient.coteOpere}</strong> • Profil: <strong className="text-slate-900">{patient.profilSportif}</strong>
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="bg-[#E5A73C] hover:bg-[#d4962b] text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm">
-            <span>📄</span> Générer le bilan PDF
+          <button 
+            onClick={handleSaveBilan}
+            className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs shadow-sm flex items-center gap-2 transition-all"
+          >
+            <span>💾</span> Enregistrer le brouillon
           </button>
-          <button className="bg-white border border-slate-300 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs shadow-sm">
-            Enregistrer le brouillon
+
+          <button 
+            onClick={handleExportPdf}
+            className="bg-[#E5A73C] hover:bg-[#d4962b] text-slate-950 font-extrabold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all"
+          >
+            <span>📄</span> Générer le bilan PDF
           </button>
         </div>
       </div>
 
-      {/* BANDEAU DE DATES ET CALCUL POST-OPÉRATOIRE */}
+      {/* BANDEAU DATES ET DÉLAI POST-OP */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between text-xs font-bold">
         <div className="flex items-center gap-3">
           <span className="text-slate-500 font-semibold">Date du bilan :</span>
@@ -215,13 +370,13 @@ export default function BilanFormView() {
         </div>
 
         <div className="grid grid-cols-3 gap-6 text-xs">
-          {/* ACL-RSI & Vaste Médial */}
           <div className="space-y-4">
             <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl">
               <span className="font-bold text-slate-800">Confiance (ACL-RSI) %</span>
               <input
                 type="number"
                 value={aclRsi}
+                placeholder="0"
                 onChange={(e) => setAclRsi(e.target.value)}
                 className="w-20 bg-white border border-slate-300 text-slate-900 rounded-lg p-2 text-center font-bold shadow-sm"
               />
@@ -239,31 +394,30 @@ export default function BilanFormView() {
                 <input type="number" value={vasteG} onChange={(e) => setVasteG(e.target.value)} className="w-14 bg-white border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" placeholder="G" />
                 <input type="number" value={vasteD} onChange={(e) => setVasteD(e.target.value)} className="w-14 bg-white border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" placeholder="D" />
               </div>
-              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(vasteG) < 80 ? 'bg-rose-500' : Number(vasteG) < 150 ? 'bg-amber-500' : 'bg-emerald-500'}`}>
-                {Number(vasteG) < 80 ? 'Inhibition' : 'OK'}
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(vasteG) < 80 && vasteG !== '' ? 'bg-rose-500' : Number(vasteG) < 150 && vasteG !== '' ? 'bg-amber-500' : 'bg-emerald-500'}`}>
+                {Number(vasteG) < 80 && vasteG !== '' ? 'Inhibition' : 'OK'}
               </span>
             </div>
           </div>
 
-          {/* Amplitudes ROM */}
           <div className="bg-slate-50 p-3.5 rounded-xl space-y-3">
             <p className="font-bold text-slate-800">Amplitudes ROM (°)</p>
             <div className="flex items-center justify-between">
               <span className="text-slate-700 font-semibold">Extension (G / D)</span>
               <div className="flex gap-2">
-                <input type="number" value={extG} onChange={(e) => setExtG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
-                <input type="number" value={extD} onChange={(e) => setExtD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+                <input type="number" value={extG} placeholder="G" onChange={(e) => setExtG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+                <input type="number" value={extD} placeholder="D" onChange={(e) => setExtD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
               </div>
-              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(extG) === 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                {Number(extG) === 0 ? 'Validé' : 'Flessum'}
+              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(extG) === 0 && extG !== '' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                {Number(extG) === 0 && extG !== '' ? 'Validé' : 'Flessum'}
               </span>
             </div>
 
             <div className="flex items-center justify-between">
               <span className="text-slate-700 font-semibold">Flexion (G / D)</span>
               <div className="flex gap-2">
-                <input type="number" value={flexG} onChange={(e) => setFlexG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
-                <input type="number" value={flexD} onChange={(e) => setFlexD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+                <input type="number" value={flexG} placeholder="G" onChange={(e) => setFlexG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+                <input type="number" value={flexD} placeholder="D" onChange={(e) => setFlexD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
               </div>
               <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(flexG) >= 120 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
                 {Number(flexG) >= 120 ? 'Validé' : 'Non-Validé'}
@@ -271,7 +425,6 @@ export default function BilanFormView() {
             </div>
           </div>
 
-          {/* Cicatrice */}
           <div className="bg-slate-50 p-3.5 rounded-xl space-y-2.5">
             <p className="font-bold text-slate-800">État Cicatriciel</p>
             <div className="space-y-2">
@@ -296,7 +449,7 @@ export default function BilanFormView() {
         </div>
       </div>
 
-      {/* RANGÉE 2 : TESTS FONCTIONNELS (QUALITATIF & QUANTITATIF SÉPARÉS) */}
+      {/* RANGÉE 2 : TESTS FONCTIONNELS (STRUCTURES ET EN-TÊTES INITIALES CONSERVÉES) */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-6">
         <div className="flex items-center gap-3 border-b pb-3">
           <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">2</span>
@@ -305,7 +458,7 @@ export default function BilanFormView() {
 
         <div className="grid grid-cols-2 gap-8 items-start">
           
-          {/* SOUS-BLOC A : TESTS QUALITATIFS (PLATEFORME DE FORCE / SQUAT & CMJ) */}
+          {/* SOUS-BLOC A : QUALITATIFS (SQUAT & CMJ) */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4">
             <h4 className="font-extrabold text-amber-700 text-xs uppercase tracking-wider border-b border-amber-200 pb-2 flex justify-between items-center">
               <span>A. Test Fonctionnel Qualitatif</span>
@@ -382,7 +535,7 @@ export default function BilanFormView() {
 
           </div>
 
-          {/* SOUS-BLOC B : TESTS QUANTITATIFS (HOP TESTS & AGILITÉ) */}
+          {/* SOUS-BLOC B : QUANTITATIFS (10 HOP TESTS ET AGILITÉ) */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-3">
             <h4 className="font-extrabold text-amber-700 text-xs uppercase tracking-wider border-b border-amber-200 pb-2 flex justify-between items-center">
               <span>B. Test Fonctionnel Quantitatif</span>
@@ -434,14 +587,14 @@ export default function BilanFormView() {
         </div>
       </div>
 
-      {/* RANGÉE 3 : BLOC QUALITÉ DU MOUVEMENT (LATERAL STEP DOWN + TABLEAU QASLS STRICT) */}
+      {/* RANGÉE 3 : QUALITÉ DU MOUVEMENT (LATERAL STEP DOWN + TABLEAU QASLS STRICT) */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-6 text-slate-900">
         <div className="flex items-center gap-3 border-b pb-3">
           <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">3</span>
           <h3 className="font-bold text-slate-800 text-base">Qualité du Mouvement</h3>
         </div>
 
-        {/* SECTION 1 : LATERAL STEP DOWN (GAUCHE / DROITE) */}
+        {/* LATERAL STEP DOWN */}
         <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-200 text-xs">
           <p className="font-bold text-slate-800 border-b pb-2">Latéral Step Down</p>
           <div className="grid grid-cols-2 gap-6">
@@ -479,7 +632,7 @@ export default function BilanFormView() {
           </div>
         </div>
 
-        {/* SECTION 2 : SINGLE LEG LANDING & GRILLE QASLS MOT POUR MOT */}
+        {/* QASLS GRILLE COMPLETE */}
         <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200 text-xs">
           <div className="flex items-center justify-between border-b pb-2">
             <div>
@@ -487,7 +640,6 @@ export default function BilanFormView() {
               <p className="text-[10px] text-slate-500">Qualitative Assessment of Single-Leg Loading System</p>
             </div>
 
-            {/* Total d'erreurs calculé automatiquement */}
             <div className="flex gap-3">
               <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-3 py-1 rounded-lg text-[11px]">
                 TOTAL Erreurs Gauche : <span className="text-slate-950 font-black">{calcTotalQasls('G')}</span>
@@ -498,7 +650,6 @@ export default function BilanFormView() {
             </div>
           </div>
 
-          {/* TABLEAU QASLS STRICTEMENT CONFORME À LA CAPTURE D'ÉCRAN */}
           <div className="overflow-x-auto">
             <table className="w-full text-[11px] text-left border-collapse bg-white rounded-lg border border-slate-300">
               <thead>
@@ -510,23 +661,18 @@ export default function BilanFormView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {/* Utilisation des bras */}
                 <tr>
                   <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50">Utilisation des bras</td>
                   <td className="p-2 border-r font-medium">Mouvement excessif des bras</td>
                   <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.mouvementExcessifBrasG} onChange={(e)=>setQasls({...qasls, mouvementExcessifBrasG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                   <td className="text-center p-2"><input type="checkbox" checked={qasls.mouvementExcessifBrasD} onChange={(e)=>setQasls({...qasls, mouvementExcessifBrasD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
-
-                {/* Alignement du buste */}
                 <tr className="bg-slate-50/30">
                   <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50">Alignement du buste</td>
                   <td className="p-2 border-r font-medium">Incliné dans différentes positions</td>
                   <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.inclinePositionsG} onChange={(e)=>setQasls({...qasls, inclinePositionsG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                   <td className="text-center p-2"><input type="checkbox" checked={qasls.inclinePositionsD} onChange={(e)=>setQasls({...qasls, inclinePositionsD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
-
-                {/* Niveau du Bassin */}
                 <tr>
                   <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Niveau du Bassin</td>
                   <td className="p-2 border-r font-medium">Perte du plan horizontal</td>
@@ -538,8 +684,6 @@ export default function BilanFormView() {
                   <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.basculeOuRotationG} onChange={(e)=>setQasls({...qasls, basculeOuRotationG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                   <td className="text-center p-2"><input type="checkbox" checked={qasls.basculeOuRotationD} onChange={(e)=>setQasls({...qasls, basculeOuRotationD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
-
-                {/* Mouvement de la cuisse */}
                 <tr className="bg-slate-50/30">
                   <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Mouvement de la cuisse</td>
                   <td className="p-2 border-r font-medium">Abduction de hance</td>
@@ -551,8 +695,6 @@ export default function BilanFormView() {
                   <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.positionNeutreNonMaintenueG} onChange={(e)=>setQasls({...qasls, positionNeutreNonMaintenueG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                   <td className="text-center p-2"><input type="checkbox" checked={qasls.positionNeutreNonMaintenueD} onChange={(e)=>setQasls({...qasls, positionNeutreNonMaintenueD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
-
-                {/* Position du genou */}
                 <tr>
                   <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Position du genou</td>
                   <td className="p-2 border-r font-medium">Rotule orientée vers le 2ième orteils</td>
@@ -564,8 +706,6 @@ export default function BilanFormView() {
                   <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.rotuleInterieurPiedG} onChange={(e)=>setQasls({...qasls, rotuleInterieurPiedG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                   <td className="text-center p-2"><input type="checkbox" checked={qasls.rotuleInterieurPiedD} onChange={(e)=>setQasls({...qasls, rotuleInterieurPiedD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
-
-                {/* Stabilité de la posture */}
                 <tr className="bg-slate-50/30">
                   <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Stabilité de la posture</td>
                   <td className="p-2 border-r font-medium">Rééquilibrer avec l'autre jambe</td>
@@ -577,8 +717,6 @@ export default function BilanFormView() {
                   <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.jambeReceptionVacilleG} onChange={(e)=>setQasls({...qasls, jambeReceptionVacilleG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                   <td className="text-center p-2"><input type="checkbox" checked={qasls.jambeReceptionVacilleD} onChange={(e)=>setQasls({...qasls, jambeReceptionVacilleD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
-
-                {/* TOTAL ERREURS */}
                 <tr className="bg-slate-200/80 font-extrabold text-slate-900 border-t-2 border-slate-300">
                   <td className="p-2.5 border-r" colSpan="2">TOTAL Erreurs</td>
                   <td className="text-center p-2 border-r text-amber-900 font-black text-xs">{calcTotalQasls('G')}</td>
@@ -588,7 +726,7 @@ export default function BilanFormView() {
             </table>
           </div>
 
-          {/* CAPTURES PHOTOS (2 PHOTOS : FACE JAMBE GAUCHE, FACE JAMBE DROITE) */}
+          {/* CAPTURES PHOTOS */}
           <div className="pt-2">
             <p className="font-bold text-slate-800 text-[11px] mb-2">+ 2 photos: face jambe gauche, face jambe droite :</p>
             <div className="grid grid-cols-2 gap-4">
@@ -619,7 +757,6 @@ export default function BilanFormView() {
               </label>
             </div>
           </div>
-
         </div>
       </div>
 
@@ -651,8 +788,8 @@ export default function BilanFormView() {
             {/* Quadriceps */}
             <tr>
               <td className="py-3 font-bold text-slate-800">Quadriceps (90°)</td>
-              <td className="py-2"><input type="number" value={vald.quadD} onChange={(e) => setVald({ ...vald, quadD: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2"><input type="number" value={vald.quadG} onChange={(e) => setVald({ ...vald, quadG: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.quadD} onChange={(e) => setVald({ ...vald, quadD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.quadG} onChange={(e) => setVald({ ...vald, quadG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 font-bold text-slate-800">{calcRelative(vald.quadG)} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.quad} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.quad} N/kg</td>
@@ -662,8 +799,8 @@ export default function BilanFormView() {
             {/* Ischios */}
             <tr>
               <td className="py-3 font-bold text-slate-800">Ischios-Jambiers (30°)</td>
-              <td className="py-2"><input type="number" value={vald.ischioD} onChange={(e) => setVald({ ...vald, ischioD: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2"><input type="number" value={vald.ischioG} onChange={(e) => setVald({ ...vald, ischioG: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.ischioD} onChange={(e) => setVald({ ...vald, ischioD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.ischioG} onChange={(e) => setVald({ ...vald, ischioG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 font-bold text-slate-800">{calcRelative(vald.ischioG)} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.ischio} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.ischio} N/kg</td>
@@ -673,8 +810,8 @@ export default function BilanFormView() {
             {/* Soléaire */}
             <tr>
               <td className="py-3 font-bold text-slate-800">Soléaire / Mollet</td>
-              <td className="py-2"><input type="number" value={vald.soleaireD} onChange={(e) => setVald({ ...vald, soleaireD: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2"><input type="number" value={vald.soleaireG} onChange={(e) => setVald({ ...vald, soleaireG: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.soleaireD} onChange={(e) => setVald({ ...vald, soleaireD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.soleaireG} onChange={(e) => setVald({ ...vald, soleaireG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 font-bold text-slate-800">{calcRelative(vald.soleaireG)} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.soleaire} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.soleaire} N/kg</td>
@@ -684,8 +821,8 @@ export default function BilanFormView() {
             {/* Fessiers */}
             <tr>
               <td className="py-3 font-bold text-slate-800">Moyens Fessiers</td>
-              <td className="py-2"><input type="number" value={vald.fessierD} onChange={(e) => setVald({ ...vald, fessierD: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2"><input type="number" value={vald.fessierG} onChange={(e) => setVald({ ...vald, fessierG: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.fessierD} onChange={(e) => setVald({ ...vald, fessierD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.fessierG} onChange={(e) => setVald({ ...vald, fessierG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 font-bold text-slate-800">{calcRelative(vald.fessierG)} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.fessier} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.fessier} N/kg</td>
@@ -695,8 +832,8 @@ export default function BilanFormView() {
             {/* Adducteurs */}
             <tr>
               <td className="py-3 font-bold text-slate-800">Adducteurs de Hanche</td>
-              <td className="py-2"><input type="number" value={vald.adducteurD} onChange={(e) => setVald({ ...vald, adducteurD: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2"><input type="number" value={vald.adducteurG} onChange={(e) => setVald({ ...vald, adducteurG: Number(e.target.value) })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.adducteurD} onChange={(e) => setVald({ ...vald, adducteurD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
+              <td className="py-2"><input type="number" value={vald.adducteurG} onChange={(e) => setVald({ ...vald, adducteurG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 font-bold text-slate-800">{calcRelative(vald.adducteurG)} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.adducteur} N/kg</td>
               <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.adducteur} N/kg</td>
@@ -709,17 +846,14 @@ export default function BilanFormView() {
       {/* RANGÉE 5 : PLAN D'ACTION GÉNÉRÉ AUTOMATIQUEMENT */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-3">
         <h3 className="font-extrabold text-slate-800 text-base">Plan d'Action & Directives de Rééducation (Rédigé automatiquement)</h3>
-        <p className="text-xs text-slate-500 font-medium">Ce texte est généré selon les règles métier et reste modifiable avant l'export PDF :</p>
+        <p className="text-xs text-slate-500 font-medium">Ce texte se génère automatiquement selon vos saisies ci-dessus et reste modifiable avant l'export PDF :</p>
 
         <textarea
           rows={5}
+          value={planActionText}
+          onChange={(e) => setPlanActionText(e.target.value)}
+          placeholder="Remplissez les mesures pour générer les consignes automatiques..."
           className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-900 font-bold leading-relaxed focus:outline-none focus:border-amber-500"
-          defaultValue={
-            `1. Priorité au renforcement du quadriceps, du soléaire et à la réduction de l'asymétrie.\n` +
-            `2. Poursuivre le travail de symétrie de force pour les ischios-jambiers, moyens fessiers et adducteurs.\n` +
-            `3. Présence de Pelvic Drop et Valgus dynamique lors du Latéral Step Down et score QASLS à surveiller.\n` +
-            `4. Vigilance sur la confiance du patient en sa rééducation (ACL-RSI < 60%).`
-          }
         />
       </div>
 
