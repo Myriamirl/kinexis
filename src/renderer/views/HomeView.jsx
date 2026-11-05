@@ -9,30 +9,31 @@ export default function HomeView({ currentKine, onNavigate }) {
 
   useEffect(() => {
     if (ipcRenderer) {
-      // Récupération des patients actifs depuis la BDD SQLite
+      // Charger les vrais patients depuis la base SQLite
       ipcRenderer.invoke('patients:get-actifs')
         .then((data) => {
-          if (data) {
-            // Prendre les 4 derniers enregistrés
-            const formatted = data.slice(0, 4).map(p => ({
+          if (data && Array.isArray(data)) {
+            const formatted = data.slice(0, 5).map(p => ({
               id: p.id,
               initials: `${p.nom ? p.nom[0] : ''}${p.prenom ? p.prenom[0] : ''}`.toUpperCase(),
               nom: `${p.nom} ${p.prenom}`,
               date: p.date_naissance || 'Non renseignée',
               idFormatted: String(p.id).padStart(5, '0'),
-              dernierBilan: 'Bilan récent'
+              dernierBilan: p.dernier_bilan_date || 'Aucun'
             }));
             setPatientsRecents(formatted);
           }
         })
-        .catch(err => console.error("Erreur chargement patients accueil :", err));
+        .catch(err => console.error("Erreur BDD Patients :", err));
 
-      // Récupération des bilans récents (s'il y a un handler ou simulation)
+      // Charger les vrais bilans depuis la base SQLite
       ipcRenderer.invoke('bilans:get-recents')
         .then((data) => {
-          if (data) setBilansRecents(data);
+          if (data && Array.isArray(data)) {
+            setBilansRecents(data);
+          }
         })
-        .catch(() => {});
+        .catch(err => console.error("Erreur BDD Bilans :", err));
     }
   }, []);
 
@@ -42,11 +43,11 @@ export default function HomeView({ currentKine, onNavigate }) {
 
   return (
     <div className="space-y-6 w-full h-full flex flex-col text-slate-900">
-      {/* En-tête Dynamique avec Prénom du Kiné */}
+      {/* En-tête Dynamique sans aucun prénom en dur */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-extrabold text-[#1E293B]">
-            Interface de {currentKine?.prenom || 'Praticien'},
+            Interface de {currentKine?.prenom},
           </h2>
           <p className="text-base text-slate-500 font-medium">
             Bienvenue dans votre espace {currentKine?.specialite ? `• ${currentKine.specialite}` : ''}
@@ -61,7 +62,7 @@ export default function HomeView({ currentKine, onNavigate }) {
               value={recherche}
               onChange={(e) => setRecherche(e.target.value)}
               placeholder="Rechercher un patient..."
-              className="bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 w-72 shadow-sm font-semibold"
+              className="bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#E5A73C] w-72 shadow-sm font-semibold"
             />
           </div>
           <button 
@@ -73,12 +74,10 @@ export default function HomeView({ currentKine, onNavigate }) {
         </div>
       </div>
 
-      {/* Trait de séparation doré */}
       <div className="h-1 bg-gradient-to-r from-[#E5A73C] via-[#E5A73C]/50 to-transparent rounded-full"></div>
 
-      {/* Cartes responsive */}
       <div className="grid grid-cols-2 gap-8 flex-1 items-start">
-        {/* Patients récents depuis BDD */}
+        {/* Cartes Patients (Lecture SQLite Pure) */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60">
           <div className="flex items-center gap-2.5 mb-5">
             <span className="text-slate-700 text-lg">👤</span>
@@ -87,12 +86,14 @@ export default function HomeView({ currentKine, onNavigate }) {
 
           <div className="divide-y divide-slate-100">
             {patientsFiltres.length === 0 ? (
-              <p className="text-xs text-slate-400 py-4 font-semibold text-center">Aucun patient trouvé en BDD.</p>
+              <p className="text-xs text-slate-400 py-6 font-semibold text-center">
+                Aucun patient trouvé en base de données.
+              </p>
             ) : (
-              patientsFiltres.map((p, idx) => (
-                <div key={idx} className="flex items-center justify-between py-4">
+              patientsFiltres.map((p) => (
+                <div key={p.id} className="flex items-center justify-between py-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-11 h-11 rounded-full bg-[#1E293B] text-white font-extrabold text-sm flex items-center justify-center">
+                    <div className="w-11 h-11 rounded-full bg-[#0B1E3D] text-white font-extrabold text-sm flex items-center justify-center">
                       {p.initials}
                     </div>
                     <div>
@@ -113,7 +114,7 @@ export default function HomeView({ currentKine, onNavigate }) {
           </div>
         </div>
 
-        {/* Bilans récents */}
+        {/* Cartes Bilans (Lecture SQLite Pure) */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60">
           <div className="flex items-center gap-2.5 mb-5">
             <span className="text-slate-700 text-lg">📄</span>
@@ -132,17 +133,17 @@ export default function HomeView({ currentKine, onNavigate }) {
               {bilansRecents.length === 0 ? (
                 <tr>
                   <td colSpan="3" className="py-6 text-center text-xs text-slate-400 font-semibold">
-                    Aucun bilan enregistré pour le moment.
+                    Aucun bilan enregistré en BDD.
                   </td>
                 </tr>
               ) : (
                 bilansRecents.map((b, idx) => (
-                  <tr key={idx}>
-                    <td className="py-4 font-semibold text-slate-800">{b.patientNom}</td>
-                    <td className="py-4 text-slate-500 text-xs font-medium">{b.typeBilan || 'Post-LCA'}</td>
+                  <tr key={b.id || idx}>
+                    <td className="py-4 font-semibold text-slate-800">{b.patient_nom} {b.patient_prenom}</td>
+                    <td className="py-4 text-slate-500 text-xs font-medium">{b.type_bilan || 'Post-LCA'}</td>
                     <td className="py-4 text-right">
                       <span className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                        ✓ Validé
+                        ✓ {b.statut || 'Validé'}
                       </span>
                     </td>
                   </tr>

@@ -9,26 +9,24 @@ import SettingsView from './views/SettingsView.jsx';
 export default function App() {
   const [currentKine, setCurrentKine] = useState(null);
   const [currentView, setCurrentView] = useState('home');
-  const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // Fonction pour se déconnecter
-  const handleLogout = () => {
-    setCurrentKine(null);
-  };
+  // Si non connecté : Écran de connexion
+  if (!currentKine) {
+    return <LoginView onLoginSuccess={(kine) => setCurrentKine(kine)} />;
+  }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden font-sans select-none relative">
-      {/* Sidebar toujours visible */}
+    <div className="flex h-screen w-screen overflow-hidden font-sans select-none bg-[#E8EEF5]">
+      {/* Sidebar fidèle à la maquette */}
       <Sidebar 
         currentView={currentView} 
         setCurrentView={setCurrentView} 
         currentKine={currentKine}
-        onLogout={handleLogout}
-        onLoginClick={() => setShowLoginModal(true)}
+        onLogout={() => setCurrentKine(null)}
       />
 
-      {/* Contenu principal de l'application */}
-      <main className="flex-1 flex flex-col h-full overflow-y-auto bg-[#EBF1F5] p-8">
+      {/* Contenu principal */}
+      <main className="flex-1 flex flex-col h-full overflow-y-auto p-8">
         {currentView === 'home' && (
           <HomeView 
             currentKine={currentKine}
@@ -52,32 +50,6 @@ export default function App() {
           <SettingsView currentKine={currentKine} />
         )}
       </main>
-
-{/* Modal / Overlay de Connexion */}
-{(showLoginModal || !currentKine) && (
-  <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
-    {/* Boîte centrale ajustée */}
-    <div className="relative w-full max-w-md bg-[#1E293B] border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden">
-      
-      {/* Bouton pour fermer si déjà connecté */}
-      {currentKine && (
-        <button 
-          onClick={() => setShowLoginModal(false)}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white font-bold text-xs bg-slate-800/80 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg z-10 transition-all"
-        >
-          ✕ Fermer
-        </button>
-      )}
-
-      <LoginView 
-        onLoginSuccess={(kine) => {
-          setCurrentKine(kine);
-          setShowLoginModal(false);
-        }} 
-      />
-    </div>
-  </div>
-)}
     </div>
   );
 }

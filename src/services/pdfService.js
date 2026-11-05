@@ -1,7 +1,7 @@
 const { BrowserWindow, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const generatePdfHtml = require('./pdfTemplate');
+const generatePdfHtml = require('./pdfTemplates');
 
 async function exportBilanToPdf(payload, cabinet) {
   const { patient, dataBilan } = payload;

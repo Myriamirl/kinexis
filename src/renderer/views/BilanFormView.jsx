@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// Accès au pont Electron IPC
 const { ipcRenderer } = window.require ? window.require('electron') : {};
 
 export default function BilanFormView({ currentKine }) {
@@ -14,15 +13,14 @@ export default function BilanFormView({ currentKine }) {
     poids: 0,
     taille: 0,
     coteOpere: 'Gauche',
-    profilSportif: 'Amateur'
+    profilSportif: 'Axe'
   });
 
-  // Chargement dynamique des patients au montage
   useEffect(() => {
     if (ipcRenderer) {
       ipcRenderer.invoke('patients:get-actifs')
         .then((data) => {
-          setPatientsListe(data);
+          setPatientsListe(data || []);
           if (data && data.length > 0) {
             setSelectedPatientId(data[0].id);
             updatePatientState(data[0]);
@@ -40,7 +38,7 @@ export default function BilanFormView({ currentKine }) {
       poids: pData.poids_kg || 0,
       taille: pData.taille_cm || 0,
       coteOpere: pData.cote_opere || 'Gauche',
-      profilSportif: pData.profil_sportif || 'Amateur'
+      profilSportif: pData.profil_sportif || 'Axe'
     });
   };
 
@@ -75,7 +73,7 @@ export default function BilanFormView({ currentKine }) {
     }
   }, [dateBilan, dateOperation]);
 
-  // --- MOBILITÉ & CONFIANCE (Champs vides) ---
+  // --- MOBILITÉ & CONFIANCE ---
   const [aclRsi, setAclRsi] = useState('');
   const [extG, setExtG] = useState('');
   const [extD, setExtD] = useState('');
@@ -89,7 +87,7 @@ export default function BilanFormView({ currentKine }) {
   const [vasteG, setVasteG] = useState('');
   const [vasteD, setVasteD] = useState('');
 
-  // --- TESTS FONCTIONNELS QUALITATIFS (Champs vides) ---
+  // --- TESTS FONCTIONNELS QUALITATIFS ---
   const [squatQual, setSquatQual] = useState({
     peakConcG: '', peakConcD: '',
     peakExcG: '', peakExcD: '',
@@ -106,7 +104,7 @@ export default function BilanFormView({ currentKine }) {
     hauteurSautCm: ''
   });
 
-  // --- TESTS FONCTIONNELS QUANTITATIFS (Champs vides - 10 Tests) ---
+  // --- TESTS FONCTIONNELS QUANTITATIFS ---
   const [hopTests, setHopTests] = useState({
     singleLegG: '', singleLegD: '',
     tripleHopG: '', tripleHopD: '',
@@ -120,7 +118,7 @@ export default function BilanFormView({ currentKine }) {
     timed6mG: '', timed6mD: ''
   });
 
-  // --- QUALITÉ DU MOUVEMENT (Décochés par défaut) ---
+  // --- QUALITÉ DU MOUVEMENT ---
   const [qualiteStepDown, setQualiteStepDown] = useState({
     pelvicDropG: false, pelvicDropD: false,
     valgusG: false, valgusD: false,
@@ -147,7 +145,6 @@ export default function BilanFormView({ currentKine }) {
     return keys.reduce((acc, key) => acc + (qasls[key] ? 1 : 0), 0);
   };
 
-  // Photos de contrôle
   const [photoG, setPhotoG] = useState(null);
   const [photoD, setPhotoD] = useState(null);
 
@@ -163,7 +160,7 @@ export default function BilanFormView({ currentKine }) {
     }
   };
 
-  // --- FORCE ISOMÉTRIQUE VALD (Champs vides - 6 Tests) ---
+  // --- FORCE ISOMÉTRIQUE VALD ---
   const [vald, setVald] = useState({
     quadG: '', quadD: '',
     ischioG: '', ischioD: '',
@@ -177,7 +174,6 @@ export default function BilanFormView({ currentKine }) {
     ? { quad: 8.5, ischio: 5.0, soleaire: 20.0, fessier: 6.0, adducteur: 6.0 }
     : { quad: 7.5, ischio: 4.5, soleaire: 18.0, fessier: 6.0, adducteur: 6.0 };
 
-  // --- RECALCUL AUTOMATIQUE DU PLAN D'ACTION ---
   const [planActionText, setPlanActionText] = useState('');
 
   useEffect(() => {
@@ -189,7 +185,6 @@ export default function BilanFormView({ currentKine }) {
     }
   }, [aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald, patient, cibles3M]);
 
-  // --- SAUVEGARDE EN BASE SQLITE ---
   const handleSaveBilan = async () => {
     if (!patient.id) {
       alert("Veuillez sélectionner un patient avant d'enregistrer.");
@@ -231,7 +226,6 @@ export default function BilanFormView({ currentKine }) {
     }
   };
 
-  // --- EXPORT PDF ---
   const handleExportPdf = async () => {
     await handleSaveBilan();
 
@@ -266,7 +260,6 @@ export default function BilanFormView({ currentKine }) {
     }
   };
 
-  // Calculs dynamiques
   const calcRelative = (forceN) => {
     if (!forceN || !patient.poids || patient.poids === 0) return '-';
     return (Number(forceN) / patient.poids).toFixed(1);
@@ -287,7 +280,7 @@ export default function BilanFormView({ currentKine }) {
   return (
     <div className="space-y-8 w-full h-full flex flex-col pb-12 text-slate-900">
       
-      {/* EN-TÊTE DYNAMIQUE AVEC SELECTION PATIENT SQLITE */}
+      {/* EN-TÊTE DYNAMIQUE */}
       <div className="flex items-center justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="space-y-2">
           <h2 className="text-2xl font-extrabold text-[#1E293B]">Nouveau Bilan Post-LCA</h2>
@@ -362,7 +355,7 @@ export default function BilanFormView({ currentKine }) {
 
       <div className="h-1 bg-gradient-to-r from-[#E5A73C] via-[#E5A73C]/50 to-transparent rounded-full"></div>
 
-      {/* RANGÉE 1 : MOBILITÉ & CONFIANCE */}
+      {/* RANGÉE 1 : MOBILITÉ & CONFIANCE (AMPLITUDES ROM ALIGNÉES PROPREMENT) */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-4">
         <div className="flex items-center gap-3 border-b pb-3">
           <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">1</span>
@@ -372,7 +365,7 @@ export default function BilanFormView({ currentKine }) {
         <div className="grid grid-cols-3 gap-6 text-xs">
           <div className="space-y-4">
             <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl">
-              <span className="font-bold text-slate-800">Confiance (ACL-RSI) %</span>
+              <span className="font-bold text-slate-800 text-sm">Confiance (ACL-RSI) %</span>
               <input
                 type="number"
                 value={aclRsi}
@@ -387,12 +380,12 @@ export default function BilanFormView({ currentKine }) {
 
             <div className="flex items-center justify-between bg-slate-50 p-3.5 rounded-xl">
               <div>
-                <p className="font-bold text-slate-800">Activation Vaste Médial</p>
+                <p className="font-bold text-slate-800 text-sm">Activation Vaste Médial</p>
                 <p className="text-[10px] text-slate-500">Unités dynamométriques</p>
               </div>
               <div className="flex gap-2">
-                <input type="number" value={vasteG} onChange={(e) => setVasteG(e.target.value)} className="w-14 bg-white border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" placeholder="G" />
-                <input type="number" value={vasteD} onChange={(e) => setVasteD(e.target.value)} className="w-14 bg-white border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" placeholder="D" />
+                <input type="number" value={vasteG} onChange={(e) => setVasteG(e.target.value)} className="w-14 bg-white border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" placeholder="G" />
+                <input type="number" value={vasteD} onChange={(e) => setVasteD(e.target.value)} className="w-14 bg-white border border-slate-300 text-slate-900 rounded p-1.5 text-center font-bold" placeholder="D" />
               </div>
               <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(vasteG) < 80 && vasteG !== '' ? 'bg-rose-500' : Number(vasteG) < 150 && vasteG !== '' ? 'bg-amber-500' : 'bg-emerald-500'}`}>
                 {Number(vasteG) < 80 && vasteG !== '' ? 'Inhibition' : 'OK'}
@@ -400,46 +393,52 @@ export default function BilanFormView({ currentKine }) {
             </div>
           </div>
 
-          <div className="bg-slate-50 p-3.5 rounded-xl space-y-3">
-            <p className="font-bold text-slate-800">Amplitudes ROM (°)</p>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-700 font-semibold">Extension (G / D)</span>
-              <div className="flex gap-2">
-                <input type="number" value={extG} placeholder="G" onChange={(e) => setExtG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
-                <input type="number" value={extD} placeholder="D" onChange={(e) => setExtD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+          {/* AMPLITUDES ROM ALIGNÉES PARFAITEMENT EN GRILLE */}
+          <div className="bg-slate-50 p-4 rounded-xl space-y-3">
+            <p className="font-bold text-slate-800 text-sm border-b pb-1">Amplitudes ROM (°)</p>
+            
+            <div className="grid grid-cols-12 items-center gap-2">
+              <span className="col-span-5 text-slate-700 font-bold text-xs">Extension (G / D)</span>
+              <div className="col-span-4 flex gap-1.5 justify-center">
+                <input type="number" value={extG} placeholder="G" onChange={(e) => setExtG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1.5 text-center font-bold text-xs" />
+                <input type="number" value={extD} placeholder="D" onChange={(e) => setExtD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1.5 text-center font-bold text-xs" />
               </div>
-              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(extG) === 0 && extG !== '' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                {Number(extG) === 0 && extG !== '' ? 'Validé' : 'Flessum'}
-              </span>
+              <div className="col-span-3 text-right">
+                <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(extG) === 0 && extG !== '' ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                  {Number(extG) === 0 && extG !== '' ? 'Validé' : 'Flessum'}
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-slate-700 font-semibold">Flexion (G / D)</span>
-              <div className="flex gap-2">
-                <input type="number" value={flexG} placeholder="G" onChange={(e) => setFlexG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
-                <input type="number" value={flexD} placeholder="D" onChange={(e) => setFlexD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1 text-center font-bold" />
+            <div className="grid grid-cols-12 items-center gap-2 pt-1">
+              <span className="col-span-5 text-slate-700 font-bold text-xs">Flexion (G / D)</span>
+              <div className="col-span-4 flex gap-1.5 justify-center">
+                <input type="number" value={flexG} placeholder="G" onChange={(e) => setFlexG(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1.5 text-center font-bold text-xs" />
+                <input type="number" value={flexD} placeholder="D" onChange={(e) => setFlexD(e.target.value)} className="w-14 bg-white border border-slate-300 rounded p-1.5 text-center font-bold text-xs" />
               </div>
-              <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(flexG) >= 120 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
-                {Number(flexG) >= 120 ? 'Validé' : 'Non-Validé'}
-              </span>
+              <div className="col-span-3 text-right">
+                <span className={`px-2 py-1 rounded-full text-[10px] font-bold text-white ${Number(flexG) >= 120 ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                  {Number(flexG) >= 120 ? 'Validé' : 'Non-Validé'}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="bg-slate-50 p-3.5 rounded-xl space-y-2.5">
-            <p className="font-bold text-slate-800">État Cicatriciel</p>
+            <p className="font-bold text-slate-800 text-sm">État Cicatriciel</p>
             <div className="space-y-2">
-              <select value={cicatriceTrophicite} onChange={(e) => setCicatriceTrophicite(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold">
+              <select value={cicatriceTrophicite} onChange={(e) => setCicatriceTrophicite(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold text-xs">
                 <option value="Normotrophique">Normotrophique</option>
                 <option value="Inflammatoire">Inflammatoire</option>
                 <option value="Hypertrophique">Hypertrophique</option>
                 <option value="Chéloïde">Chéloïde</option>
               </select>
-              <select value={cicatriceAdherence} onChange={(e) => setCicatriceAdherence(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold">
+              <select value={cicatriceAdherence} onChange={(e) => setCicatriceAdherence(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold text-xs">
                 <option value="Souple et mobile">Souple & mobile</option>
                 <option value="Adhérence superficielle">Adhérence superficielle</option>
                 <option value="Adhérence profonde">Adhérence profonde</option>
               </select>
-              <select value={cicatriceSensibilite} onChange={(e) => setCicatriceSensibilite(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold">
+              <select value={cicatriceSensibilite} onChange={(e) => setCicatriceSensibilite(e.target.value)} className="w-full bg-white border border-slate-300 rounded p-1.5 font-bold text-xs">
                 <option value="Indolore">Indolore</option>
                 <option value="Douloureuse">Douloureuse</option>
                 <option value="Hypoesthésie">Hypoesthésie</option>
@@ -449,7 +448,7 @@ export default function BilanFormView({ currentKine }) {
         </div>
       </div>
 
-      {/* RANGÉE 2 : TESTS FONCTIONNELS (STRUCTURES ET EN-TÊTES INITIALES CONSERVÉES) */}
+      {/* RANGÉE 2 : TESTS FONCTIONNELS (LIBELLÉS GROSSIS ET LISIBLES) */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-6">
         <div className="flex items-center gap-3 border-b pb-3">
           <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">2</span>
@@ -458,76 +457,76 @@ export default function BilanFormView({ currentKine }) {
 
         <div className="grid grid-cols-2 gap-8 items-start">
           
-          {/* SOUS-BLOC A : QUALITATIFS (SQUAT & CMJ) */}
+          {/* SOUS-BLOC A : QUALITATIFS (SQUAT & CMJ) - TEXTE GROSSI */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4">
             <h4 className="font-extrabold text-amber-700 text-xs uppercase tracking-wider border-b border-amber-200 pb-2 flex justify-between items-center">
               <span>A. Test Fonctionnel Qualitatif</span>
-              <span className="text-[10px] text-slate-500 font-normal">Plateforme / Force</span>
+              <span className="text-xs text-slate-500 font-semibold">Plateforme / Force</span>
             </h4>
 
             {/* Squat Bipodal */}
-            <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
-              <p className="font-bold text-slate-800 text-xs">Squat Bipodal</p>
-              <div className="grid grid-cols-3 gap-2 text-[11px]">
-                <span className="text-slate-600 font-semibold">Paramètre</span>
-                <span className="text-center font-bold text-slate-700">Gauche</span>
-                <span className="text-center font-bold text-slate-700">Droite</span>
+            <div className="space-y-3 bg-white p-3.5 rounded-lg border border-slate-200">
+              <p className="font-extrabold text-slate-800 text-sm">Squat Bipodal</p>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <span className="text-slate-600 font-bold">Paramètre</span>
+                <span className="text-center font-extrabold text-slate-800">Gauche</span>
+                <span className="text-center font-extrabold text-slate-800">Droite</span>
 
-                <span>Peak Force Conc. (N)</span>
-                <input type="number" value={squatQual.peakConcG} onChange={(e) => setSquatQual({...squatQual, peakConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
-                <input type="number" value={squatQual.peakConcD} onChange={(e) => setSquatQual({...squatQual, peakConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <span className="font-bold text-slate-700">Peak Force Conc. (N)</span>
+                <input type="number" value={squatQual.peakConcG} onChange={(e) => setSquatQual({...squatQual, peakConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
+                <input type="number" value={squatQual.peakConcD} onChange={(e) => setSquatQual({...squatQual, peakConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
 
-                <span>Peak Force Exc. (N)</span>
-                <input type="number" value={squatQual.peakExcG} onChange={(e) => setSquatQual({...squatQual, peakExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
-                <input type="number" value={squatQual.peakExcD} onChange={(e) => setSquatQual({...squatQual, peakExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <span className="font-bold text-slate-700">Peak Force Exc. (N)</span>
+                <input type="number" value={squatQual.peakExcG} onChange={(e) => setSquatQual({...squatQual, peakExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
+                <input type="number" value={squatQual.peakExcD} onChange={(e) => setSquatQual({...squatQual, peakExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
 
-                <span>Mean Force Conc. (N)</span>
-                <input type="number" value={squatQual.meanConcG} onChange={(e) => setSquatQual({...squatQual, meanConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
-                <input type="number" value={squatQual.meanConcD} onChange={(e) => setSquatQual({...squatQual, meanConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <span className="font-bold text-slate-700">Mean Force Conc. (N)</span>
+                <input type="number" value={squatQual.meanConcG} onChange={(e) => setSquatQual({...squatQual, meanConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
+                <input type="number" value={squatQual.meanConcD} onChange={(e) => setSquatQual({...squatQual, meanConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
 
-                <span>Mean Force Exc. (N)</span>
-                <input type="number" value={squatQual.meanExcG} onChange={(e) => setSquatQual({...squatQual, meanExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
-                <input type="number" value={squatQual.meanExcD} onChange={(e) => setSquatQual({...squatQual, meanExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <span className="font-bold text-slate-700">Mean Force Exc. (N)</span>
+                <input type="number" value={squatQual.meanExcG} onChange={(e) => setSquatQual({...squatQual, meanExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
+                <input type="number" value={squatQual.meanExcD} onChange={(e) => setSquatQual({...squatQual, meanExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
-                <span className="font-semibold text-slate-700">Hauteur de déplacement :</span>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                <span className="font-bold text-slate-700">Hauteur de déplacement :</span>
                 <div className="flex items-center gap-1">
-                  <input type="number" value={squatQual.hauteurCm} onChange={(e) => setSquatQual({...squatQual, hauteurCm: e.target.value})} className="w-16 bg-slate-50 border rounded p-1 text-center font-bold" />
+                  <input type="number" value={squatQual.hauteurCm} onChange={(e) => setSquatQual({...squatQual, hauteurCm: e.target.value})} className="w-16 bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
                   <span className="font-bold text-slate-600">cm</span>
                 </div>
               </div>
             </div>
 
-            {/* CMJ (Countermovement Jump) */}
-            <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
-              <p className="font-bold text-slate-800 text-xs">CMJ (Countermovement Jump)</p>
-              <div className="grid grid-cols-3 gap-2 text-[11px]">
-                <span className="text-slate-600 font-semibold">Paramètre</span>
-                <span className="text-center font-bold text-slate-700">Gauche</span>
-                <span className="text-center font-bold text-slate-700">Droite</span>
+            {/* CMJ */}
+            <div className="space-y-3 bg-white p-3.5 rounded-lg border border-slate-200">
+              <p className="font-extrabold text-slate-800 text-sm">CMJ (Countermovement Jump)</p>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <span className="text-slate-600 font-bold">Paramètre</span>
+                <span className="text-center font-extrabold text-slate-800">Gauche</span>
+                <span className="text-center font-extrabold text-slate-800">Droite</span>
 
-                <span>Impulsion Conc.</span>
-                <input type="number" value={cmj.impulsionConcG} onChange={(e) => setCmj({...cmj, impulsionConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
-                <input type="number" value={cmj.impulsionConcD} onChange={(e) => setCmj({...cmj, impulsionConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <span className="font-bold text-slate-700">Impulsion Conc.</span>
+                <input type="number" value={cmj.impulsionConcG} onChange={(e) => setCmj({...cmj, impulsionConcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
+                <input type="number" value={cmj.impulsionConcD} onChange={(e) => setCmj({...cmj, impulsionConcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
 
-                <span>Force Freinage Exc.</span>
-                <input type="number" value={cmj.freinageExcG} onChange={(e) => setCmj({...cmj, freinageExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
-                <input type="number" value={cmj.freinageExcD} onChange={(e) => setCmj({...cmj, freinageExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <span className="font-bold text-slate-700">Force Freinage Exc.</span>
+                <input type="number" value={cmj.freinageExcG} onChange={(e) => setCmj({...cmj, freinageExcG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
+                <input type="number" value={cmj.freinageExcD} onChange={(e) => setCmj({...cmj, freinageExcD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
 
-                <span>Vitesse Freinage Exc.</span>
-                <input type="number" value={cmj.vitesseFreinG} onChange={(e) => setCmj({...cmj, vitesseFreinG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
-                <input type="number" value={cmj.vitesseFreinD} onChange={(e) => setCmj({...cmj, vitesseFreinD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <span className="font-bold text-slate-700">Vitesse Freinage Exc.</span>
+                <input type="number" value={cmj.vitesseFreinG} onChange={(e) => setCmj({...cmj, vitesseFreinG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
+                <input type="number" value={cmj.vitesseFreinD} onChange={(e) => setCmj({...cmj, vitesseFreinD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
 
-                <span>Pic Force Réception</span>
-                <input type="number" value={cmj.picReceptionG} onChange={(e) => setCmj({...cmj, picReceptionG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
-                <input type="number" value={cmj.picReceptionD} onChange={(e) => setCmj({...cmj, picReceptionD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold" />
+                <span className="font-bold text-slate-700">Pic Force Réception</span>
+                <input type="number" value={cmj.picReceptionG} onChange={(e) => setCmj({...cmj, picReceptionG: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
+                <input type="number" value={cmj.picReceptionD} onChange={(e) => setCmj({...cmj, picReceptionD: e.target.value})} className="bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
-                <span className="font-semibold text-slate-700">Hauteur du saut :</span>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                <span className="font-bold text-slate-700">Hauteur du saut :</span>
                 <div className="flex items-center gap-1">
-                  <input type="number" value={cmj.hauteurSautCm} onChange={(e) => setCmj({...cmj, hauteurSautCm: e.target.value})} className="w-16 bg-slate-50 border rounded p-1 text-center font-bold" />
+                  <input type="number" value={cmj.hauteurSautCm} onChange={(e) => setCmj({...cmj, hauteurSautCm: e.target.value})} className="w-16 bg-slate-50 border rounded p-1 text-center font-bold text-xs" />
                   <span className="font-bold text-slate-600">cm</span>
                 </div>
               </div>
@@ -535,15 +534,15 @@ export default function BilanFormView({ currentKine }) {
 
           </div>
 
-          {/* SOUS-BLOC B : QUANTITATIFS (10 HOP TESTS ET AGILITÉ) */}
+          {/* SOUS-BLOC B : QUANTITATIFS (10 HOP TESTS ET AGILITÉ) - LIBELLÉS NOMS D'EXERCICES GROSSIS */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-3">
             <h4 className="font-extrabold text-amber-700 text-xs uppercase tracking-wider border-b border-amber-200 pb-2 flex justify-between items-center">
               <span>B. Test Fonctionnel Quantitatif</span>
-              <span className="text-[10px] text-slate-500 font-normal">Sauts & Temps</span>
+              <span className="text-xs text-slate-500 font-semibold">Sauts & Temps</span>
             </h4>
 
-            <div className="space-y-2 text-[11px]">
-              <div className="grid grid-cols-4 gap-2 text-center font-bold text-slate-600 border-b pb-1">
+            <div className="space-y-2 text-xs">
+              <div className="grid grid-cols-4 gap-2 text-center font-extrabold text-slate-700 border-b pb-1.5 text-xs">
                 <span className="text-left">Test Hop</span>
                 <span>Gauche</span>
                 <span>Droite</span>
@@ -562,19 +561,19 @@ export default function BilanFormView({ currentKine }) {
                 { label: 'Illinois Modifié (s)', keyG: 'illinoisModG', keyD: 'illinoisModD' },
                 { label: '6m Timed Hop Test (s)', keyG: 'timed6mG', keyD: 'timed6mD' },
               ].map((item, idx) => (
-                <div key={idx} className="grid grid-cols-4 gap-2 items-center">
-                  <span className="font-semibold text-slate-800 text-[10px]">{item.label}</span>
+                <div key={idx} className="grid grid-cols-4 gap-2 items-center py-0.5">
+                  <span className="font-extrabold text-slate-900 text-xs">{item.label}</span>
                   <input
                     type="number"
                     value={hopTests[item.keyG]}
                     onChange={(e) => setHopTests({ ...hopTests, [item.keyG]: e.target.value })}
-                    className="bg-white border rounded p-1 text-center font-bold"
+                    className="bg-white border border-slate-300 rounded p-1.5 text-center font-bold text-xs"
                   />
                   <input
                     type="number"
                     value={hopTests[item.keyD]}
                     onChange={(e) => setHopTests({ ...hopTests, [item.keyD]: e.target.value })}
-                    className="bg-white border rounded p-1 text-center font-bold"
+                    className="bg-white border border-slate-300 rounded p-1.5 text-center font-bold text-xs"
                   />
                   <div className="text-center">
                     {getLsiBadge(calcLSI(hopTests[item.keyG], hopTests[item.keyD]))}
@@ -587,7 +586,7 @@ export default function BilanFormView({ currentKine }) {
         </div>
       </div>
 
-      {/* RANGÉE 3 : QUALITÉ DU MOUVEMENT (LATERAL STEP DOWN + TABLEAU QASLS STRICT) */}
+      {/* RANGÉE 3 : QUALITÉ DU MOUVEMENT */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-6 text-slate-900">
         <div className="flex items-center gap-3 border-b pb-3">
           <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">3</span>
@@ -596,35 +595,35 @@ export default function BilanFormView({ currentKine }) {
 
         {/* LATERAL STEP DOWN */}
         <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-200 text-xs">
-          <p className="font-bold text-slate-800 border-b pb-2">Latéral Step Down</p>
+          <p className="font-bold text-slate-800 border-b pb-2 text-sm">Latéral Step Down</p>
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
-              <p className="font-extrabold text-slate-700 text-[10px] uppercase bg-slate-100 px-2 py-1 rounded text-center">Jambe Gauche</p>
-              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+              <p className="font-extrabold text-slate-700 text-xs uppercase bg-slate-100 px-2 py-1 rounded text-center">Jambe Gauche</p>
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800">
                 <input type="checkbox" checked={qualiteStepDown.pelvicDropG} onChange={(e) => setQualiteStepDown({...qualiteStepDown, pelvicDropG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
                 <span>Pelvic Drop</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800">
                 <input type="checkbox" checked={qualiteStepDown.valgusG} onChange={(e) => setQualiteStepDown({...qualiteStepDown, valgusG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
                 <span>Valgus Dynamique</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800">
                 <input type="checkbox" checked={qualiteStepDown.stiffLandingG} onChange={(e) => setQualiteStepDown({...qualiteStepDown, stiffLandingG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
                 <span>Stiff Landing</span>
               </label>
             </div>
 
             <div className="space-y-2 bg-white p-3 rounded-lg border border-slate-200">
-              <p className="font-extrabold text-slate-700 text-[10px] uppercase bg-slate-100 px-2 py-1 rounded text-center">Jambe Droite</p>
-              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+              <p className="font-extrabold text-slate-700 text-xs uppercase bg-slate-100 px-2 py-1 rounded text-center">Jambe Droite</p>
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800">
                 <input type="checkbox" checked={qualiteStepDown.pelvicDropD} onChange={(e) => setQualiteStepDown({...qualiteStepDown, pelvicDropD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
                 <span>Pelvic Drop</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800">
                 <input type="checkbox" checked={qualiteStepDown.valgusD} onChange={(e) => setQualiteStepDown({...qualiteStepDown, valgusD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
                 <span>Valgus Dynamique</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800">
+              <label className="flex items-center gap-2 cursor-pointer font-bold text-slate-800">
                 <input type="checkbox" checked={qualiteStepDown.stiffLandingD} onChange={(e) => setQualiteStepDown({...qualiteStepDown, stiffLandingD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 rounded" />
                 <span>Stiff Landing</span>
               </label>
@@ -632,95 +631,95 @@ export default function BilanFormView({ currentKine }) {
           </div>
         </div>
 
-        {/* QASLS GRILLE COMPLETE */}
+        {/* QASLS GRILLE */}
         <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200 text-xs">
           <div className="flex items-center justify-between border-b pb-2">
             <div>
-              <p className="font-extrabold text-slate-800 text-xs">Single Leg Landing : nombre d'erreurs (QASLS)</p>
-              <p className="text-[10px] text-slate-500">Qualitative Assessment of Single-Leg Loading System</p>
+              <p className="font-extrabold text-slate-800 text-sm">Single Leg Landing : nombre d'erreurs (QASLS)</p>
+              <p className="text-xs text-slate-500 font-medium">Qualitative Assessment of Single-Leg Loading System</p>
             </div>
 
             <div className="flex gap-3">
-              <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-3 py-1 rounded-lg text-[11px]">
+              <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-3 py-1 rounded-lg text-xs">
                 TOTAL Erreurs Gauche : <span className="text-slate-950 font-black">{calcTotalQasls('G')}</span>
               </span>
-              <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-3 py-1 rounded-lg text-[11px]">
+              <span className="bg-amber-100 text-amber-900 border border-amber-300 font-extrabold px-3 py-1 rounded-lg text-xs">
                 TOTAL Erreurs Droite : <span className="text-slate-950 font-black">{calcTotalQasls('D')}</span>
               </span>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-[11px] text-left border-collapse bg-white rounded-lg border border-slate-300">
+            <table className="w-full text-xs text-left border-collapse bg-white rounded-lg border border-slate-300">
               <thead>
-                <tr className="border-b text-slate-800 font-extrabold bg-slate-200/80">
-                  <th className="p-2 border-r w-1/4">Domaine d'Analyse</th>
-                  <th className="p-2 border-r">QASLS - Erreurs à cocher</th>
-                  <th className="p-2 text-center w-20 border-r">Gauche</th>
-                  <th className="p-2 text-center w-20">Droite</th>
+                <tr className="border-b text-slate-800 font-extrabold bg-slate-200/80 text-xs">
+                  <th className="p-2.5 border-r w-1/4">Domaine d'Analyse</th>
+                  <th className="p-2.5 border-r">QASLS - Erreurs à cocher</th>
+                  <th className="p-2.5 text-center w-20 border-r">Gauche</th>
+                  <th className="p-2.5 text-center w-20">Droite</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-200 font-semibold">
                 <tr>
-                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50">Utilisation des bras</td>
-                  <td className="p-2 border-r font-medium">Mouvement excessif des bras</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.mouvementExcessifBrasG} onChange={(e)=>setQasls({...qasls, mouvementExcessifBrasG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.mouvementExcessifBrasD} onChange={(e)=>setQasls({...qasls, mouvementExcessifBrasD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 font-bold text-slate-900 border-r bg-slate-50/50">Utilisation des bras</td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Mouvement excessif des bras</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.mouvementExcessifBrasG} onChange={(e)=>setQasls({...qasls, mouvementExcessifBrasG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.mouvementExcessifBrasD} onChange={(e)=>setQasls({...qasls, mouvementExcessifBrasD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr className="bg-slate-50/30">
-                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50">Alignement du buste</td>
-                  <td className="p-2 border-r font-medium">Incliné dans différentes positions</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.inclinePositionsG} onChange={(e)=>setQasls({...qasls, inclinePositionsG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.inclinePositionsD} onChange={(e)=>setQasls({...qasls, inclinePositionsD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 font-bold text-slate-900 border-r bg-slate-50/50">Alignement du buste</td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Incliné dans différentes positions</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.inclinePositionsG} onChange={(e)=>setQasls({...qasls, inclinePositionsG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.inclinePositionsD} onChange={(e)=>setQasls({...qasls, inclinePositionsD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Niveau du Bassin</td>
-                  <td className="p-2 border-r font-medium">Perte du plan horizontal</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.pertePlanHorizontalG} onChange={(e)=>setQasls({...qasls, pertePlanHorizontalG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.pertePlanHorizontalD} onChange={(e)=>setQasls({...qasls, pertePlanHorizontalD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 font-bold text-slate-900 border-r bg-slate-50/50" rowSpan="2">Niveau du Bassin</td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Perte du plan horizontal</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.pertePlanHorizontalG} onChange={(e)=>setQasls({...qasls, pertePlanHorizontalG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.pertePlanHorizontalD} onChange={(e)=>setQasls({...qasls, pertePlanHorizontalD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr>
-                  <td className="p-2 border-r font-medium">Bascule ou rotation</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.basculeOuRotationG} onChange={(e)=>setQasls({...qasls, basculeOuRotationG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.basculeOuRotationD} onChange={(e)=>setQasls({...qasls, basculeOuRotationD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Bascule ou rotation</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.basculeOuRotationG} onChange={(e)=>setQasls({...qasls, basculeOuRotationG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.basculeOuRotationD} onChange={(e)=>setQasls({...qasls, basculeOuRotationD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr className="bg-slate-50/30">
-                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Mouvement de la cuisse</td>
-                  <td className="p-2 border-r font-medium">Abduction de hance</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.abductionHancheG} onChange={(e)=>setQasls({...qasls, abductionHancheG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.abductionHancheD} onChange={(e)=>setQasls({...qasls, abductionHancheD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 font-bold text-slate-900 border-r bg-slate-50/50" rowSpan="2">Mouvement de la cuisse</td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Abduction de hanche</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.abductionHancheG} onChange={(e)=>setQasls({...qasls, abductionHancheG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.abductionHancheD} onChange={(e)=>setQasls({...qasls, abductionHancheD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr className="bg-slate-50/30">
-                  <td className="p-2 border-r font-medium">Position neutre cuisse controlatérale non maintenue</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.positionNeutreNonMaintenueG} onChange={(e)=>setQasls({...qasls, positionNeutreNonMaintenueG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.positionNeutreNonMaintenueD} onChange={(e)=>setQasls({...qasls, positionNeutreNonMaintenueD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Position neutre cuisse controlatérale non maintenue</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.positionNeutreNonMaintenueG} onChange={(e)=>setQasls({...qasls, positionNeutreNonMaintenueG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.positionNeutreNonMaintenueD} onChange={(e)=>setQasls({...qasls, positionNeutreNonMaintenueD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Position du genou</td>
-                  <td className="p-2 border-r font-medium">Rotule orientée vers le 2ième orteils</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.rotule2emeOrteilG} onChange={(e)=>setQasls({...qasls, rotule2emeOrteilG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.rotule2emeOrteilD} onChange={(e)=>setQasls({...qasls, rotule2emeOrteilD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 font-bold text-slate-900 border-r bg-slate-50/50" rowSpan="2">Position du genou</td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Rotule orientée vers le 2ième orteils</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.rotule2emeOrteilG} onChange={(e)=>setQasls({...qasls, rotule2emeOrteilG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.rotule2emeOrteilD} onChange={(e)=>setQasls({...qasls, rotule2emeOrteilD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr>
-                  <td className="p-2 border-r font-medium">Rotule orientée vers l'intérieur du pied</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.rotuleInterieurPiedG} onChange={(e)=>setQasls({...qasls, rotuleInterieurPiedG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.rotuleInterieurPiedD} onChange={(e)=>setQasls({...qasls, rotuleInterieurPiedD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Rotule orientée vers l'intérieur du pied</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.rotuleInterieurPiedG} onChange={(e)=>setQasls({...qasls, rotuleInterieurPiedG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.rotuleInterieurPiedD} onChange={(e)=>setQasls({...qasls, rotuleInterieurPiedD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr className="bg-slate-50/30">
-                  <td className="p-2.5 font-bold text-slate-800 border-r bg-slate-50/50" rowSpan="2">Stabilité de la posture</td>
-                  <td className="p-2 border-r font-medium">Rééquilibrer avec l'autre jambe</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.reequilibrerAutreJambeG} onChange={(e)=>setQasls({...qasls, reequilibrerAutreJambeG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.reequilibrerAutreJambeD} onChange={(e)=>setQasls({...qasls, reequilibrerAutreJambeD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 font-bold text-slate-900 border-r bg-slate-50/50" rowSpan="2">Stabilité de la posture</td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">Rééquilibrer avec l'autre jambe</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.reequilibrerAutreJambeG} onChange={(e)=>setQasls({...qasls, reequilibrerAutreJambeG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.reequilibrerAutreJambeD} onChange={(e)=>setQasls({...qasls, reequilibrerAutreJambeD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr className="bg-slate-50/30">
-                  <td className="p-2 border-r font-medium">La jambe de reception vacille</td>
-                  <td className="text-center p-2 border-r"><input type="checkbox" checked={qasls.jambeReceptionVacilleG} onChange={(e)=>setQasls({...qasls, jambeReceptionVacilleG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
-                  <td className="text-center p-2"><input type="checkbox" checked={qasls.jambeReceptionVacilleD} onChange={(e)=>setQasls({...qasls, jambeReceptionVacilleD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="p-2.5 border-r font-bold text-slate-800">La jambe de reception vacille</td>
+                  <td className="text-center p-2.5 border-r"><input type="checkbox" checked={qasls.jambeReceptionVacilleG} onChange={(e)=>setQasls({...qasls, jambeReceptionVacilleG: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
+                  <td className="text-center p-2.5"><input type="checkbox" checked={qasls.jambeReceptionVacilleD} onChange={(e)=>setQasls({...qasls, jambeReceptionVacilleD: e.target.checked})} className="accent-[#E5A73C] w-4 h-4 cursor-pointer" /></td>
                 </tr>
                 <tr className="bg-slate-200/80 font-extrabold text-slate-900 border-t-2 border-slate-300">
                   <td className="p-2.5 border-r" colSpan="2">TOTAL Erreurs</td>
-                  <td className="text-center p-2 border-r text-amber-900 font-black text-xs">{calcTotalQasls('G')}</td>
-                  <td className="text-center p-2 text-amber-900 font-black text-xs">{calcTotalQasls('D')}</td>
+                  <td className="text-center p-2.5 border-r text-amber-900 font-black text-xs">{calcTotalQasls('G')}</td>
+                  <td className="text-center p-2.5 text-amber-900 font-black text-xs">{calcTotalQasls('D')}</td>
                 </tr>
               </tbody>
             </table>
@@ -728,7 +727,7 @@ export default function BilanFormView({ currentKine }) {
 
           {/* CAPTURES PHOTOS */}
           <div className="pt-2">
-            <p className="font-bold text-slate-800 text-[11px] mb-2">+ 2 photos: face jambe gauche, face jambe droite :</p>
+            <p className="font-bold text-slate-800 text-xs mb-2">+ 2 photos: face jambe gauche, face jambe droite :</p>
             <div className="grid grid-cols-2 gap-4">
               <label className="border-2 border-dashed border-slate-300 rounded-xl p-3 h-32 flex flex-col items-center justify-center bg-white cursor-pointer hover:bg-slate-100 transition-colors relative overflow-hidden">
                 {photoG ? (
@@ -774,7 +773,7 @@ export default function BilanFormView({ currentKine }) {
 
         <table className="w-full text-left text-xs">
           <thead>
-            <tr className="text-slate-600 border-b border-slate-200 text-[11px] font-bold">
+            <tr className="text-slate-700 border-b border-slate-200 text-xs font-extrabold">
               <th className="pb-2">Groupes Musculaires</th>
               <th className="pb-2">DROITE<br />Force (N)</th>
               <th className="pb-2">GAUCHE<br />Force (N)</th>
@@ -784,59 +783,54 @@ export default function BilanFormView({ currentKine }) {
               <th className="pb-2 text-right">LSI %</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
-            {/* Quadriceps */}
+          <tbody className="divide-y divide-slate-100 font-bold">
             <tr>
-              <td className="py-3 font-bold text-slate-800">Quadriceps (90°)</td>
+              <td className="py-3 font-extrabold text-slate-900 text-xs">Quadriceps (90°)</td>
               <td className="py-2"><input type="number" value={vald.quadD} onChange={(e) => setVald({ ...vald, quadD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.quadG} onChange={(e) => setVald({ ...vald, quadG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2 font-bold text-slate-800">{calcRelative(vald.quadG)} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.quad} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.quad} N/kg</td>
+              <td className="py-2 text-slate-800">{calcRelative(vald.quadG)} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{cibles3M.quad} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{ciblesSport.quad} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.quadG, vald.quadD))}</td>
             </tr>
 
-            {/* Ischios */}
             <tr>
-              <td className="py-3 font-bold text-slate-800">Ischios-Jambiers (30°)</td>
+              <td className="py-3 font-extrabold text-slate-900 text-xs">Ischios-Jambiers (30°)</td>
               <td className="py-2"><input type="number" value={vald.ischioD} onChange={(e) => setVald({ ...vald, ischioD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.ischioG} onChange={(e) => setVald({ ...vald, ischioG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2 font-bold text-slate-800">{calcRelative(vald.ischioG)} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.ischio} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.ischio} N/kg</td>
+              <td className="py-2 text-slate-800">{calcRelative(vald.ischioG)} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{cibles3M.ischio} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{ciblesSport.ischio} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.ischioG, vald.ischioD))}</td>
             </tr>
 
-            {/* Soléaire */}
             <tr>
-              <td className="py-3 font-bold text-slate-800">Soléaire / Mollet</td>
+              <td className="py-3 font-extrabold text-slate-900 text-xs">Soléaire / Mollet</td>
               <td className="py-2"><input type="number" value={vald.soleaireD} onChange={(e) => setVald({ ...vald, soleaireD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.soleaireG} onChange={(e) => setVald({ ...vald, soleaireG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2 font-bold text-slate-800">{calcRelative(vald.soleaireG)} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.soleaire} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.soleaire} N/kg</td>
+              <td className="py-2 text-slate-800">{calcRelative(vald.soleaireG)} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{cibles3M.soleaire} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{ciblesSport.soleaire} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.soleaireG, vald.soleaireD))}</td>
             </tr>
 
-            {/* Fessiers */}
             <tr>
-              <td className="py-3 font-bold text-slate-800">Moyens Fessiers</td>
+              <td className="py-3 font-extrabold text-slate-900 text-xs">Moyens Fessiers</td>
               <td className="py-2"><input type="number" value={vald.fessierD} onChange={(e) => setVald({ ...vald, fessierD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.fessierG} onChange={(e) => setVald({ ...vald, fessierG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2 font-bold text-slate-800">{calcRelative(vald.fessierG)} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.fessier} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.fessier} N/kg</td>
+              <td className="py-2 text-slate-800">{calcRelative(vald.fessierG)} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{cibles3M.fessier} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{ciblesSport.fessier} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.fessierG, vald.fessierD))}</td>
             </tr>
 
-            {/* Adducteurs */}
             <tr>
-              <td className="py-3 font-bold text-slate-800">Adducteurs de Hanche</td>
+              <td className="py-3 font-extrabold text-slate-900 text-xs">Adducteurs de Hanche</td>
               <td className="py-2"><input type="number" value={vald.adducteurD} onChange={(e) => setVald({ ...vald, adducteurD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.adducteurG} onChange={(e) => setVald({ ...vald, adducteurG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
-              <td className="py-2 font-bold text-slate-800">{calcRelative(vald.adducteurG)} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{cibles3M.adducteur} N/kg</td>
-              <td className="py-2 font-bold text-slate-600">&gt;{ciblesSport.adducteur} N/kg</td>
+              <td className="py-2 text-slate-800">{calcRelative(vald.adducteurG)} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{cibles3M.adducteur} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{ciblesSport.adducteur} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.adducteurG, vald.adducteurD))}</td>
             </tr>
           </tbody>
