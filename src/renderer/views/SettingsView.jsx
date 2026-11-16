@@ -18,9 +18,47 @@ export default function SettingsView({ currentKine }) {
     adducteursAxe: '6.0', adducteursPivot: '6.0'
   });
 
+  const [messageExport, setMessageExport] = useState('');
+  const [messageRestore, setMessageRestore] = useState('');
+
   const handleSaveSettings = async () => {
     if (ipcRenderer) {
       await ipcRenderer.invoke('settings:save', { cabinetInfo, cibles });
+    }
+  };
+
+  // Gestion de l'export de la base SQLite
+  const handleExportDB = async () => {
+    setMessageExport('');
+    if (!ipcRenderer) return;
+
+    const res = await ipcRenderer.invoke('db:export');
+    if (res.success) {
+      setMessageExport(`✅ Export réussi : ${res.path}`);
+    } else if (res.error) {
+      setMessageExport(`❌ Erreur : ${res.error}`);
+    }
+  };
+
+  // Gestion de la restauration de la base SQLite
+  const handleRestoreDB = async () => {
+    setMessageRestore('');
+    if (!ipcRenderer) return;
+
+    const confirmation = window.confirm(
+      "⚠️ Attention : Restaurer une base de données va remplacer toutes les données actuelles. Voulez-vous continuer ?"
+    );
+
+    if (!confirmation) return;
+
+    const res = await ipcRenderer.invoke('db:restore');
+    if (res.success) {
+      setMessageRestore("✅ Base restaurée ! Redémarrage...");
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } else if (res.error) {
+      setMessageRestore(`❌ Erreur : ${res.error}`);
     }
   };
 
@@ -80,13 +118,21 @@ export default function SettingsView({ currentKine }) {
               <span>💾</span> Sauvegarde & Base de données
             </h3>
             <div className="flex gap-4">
-              <button className="flex-1 bg-[#0B1E3D] text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm">
+              <button 
+                onClick={handleExportDB}
+                className="flex-1 bg-[#0B1E3D] hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+              >
                 <span>⬇</span> Exporter la base SQLite
               </button>
-              <button className="flex-1 bg-white border border-slate-300 text-slate-800 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm">
+              <button 
+                onClick={handleRestoreDB}
+                className="flex-1 bg-white border border-slate-300 text-slate-800 hover:bg-slate-50 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+              >
                 <span>⏱</span> Restaurer une sauvegarde
               </button>
             </div>
+            {messageExport && <p className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 p-2 rounded-lg">{messageExport}</p>}
+            {messageRestore && <p className="text-[11px] font-semibold text-rose-700 bg-rose-50 p-2 rounded-lg">{messageRestore}</p>}
           </div>
         </div>
 

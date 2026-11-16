@@ -1,6 +1,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./ipcHandlers');
+const db = require('../database/db');
 
 let mainWindow;
 
@@ -18,12 +19,11 @@ function createWindow() {
         }
     });
 
-    // En développement, chargement via le serveur Vite local
-    if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
-        mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173');
+    // Utilisation d'app.isPackaged pour détecter proprement le mode dev vs prod
+    if (!app.isPackaged) {
+        mainWindow.loadURL('http://localhost:5173');
     } else {
-        // En production, chargement du fichier HTML compilé
-        mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+        mainWindow.loadFile(path.join(__dirname, '../../index.html'));
     }
 
     mainWindow.on('closed', () => {
@@ -32,17 +32,10 @@ function createWindow() {
 }
 
 // Initialisation au démarrage de l'application
-app.whenReady().then(() => {
-    // Enregistrement des ponts de communication IPC (SQLite / Rules Engine)
+app.whenReady().then(async () => {
+    await db.ready;
     registerIpcHandlers();
-    
     createWindow();
-
-    app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
-        }
-    });
 });
 
 // Gestion de la fermeture sous Windows / macOS

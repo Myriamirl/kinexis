@@ -12,6 +12,64 @@ function hashPassword(password) {
 
 function registerIpcHandlers() {
 
+// Exporter / Sauvegarder la base de données SQLite
+    ipcMain.handle('db:export', async () => {
+        try {
+            const { dialog } = require('electron');
+            const fs = require('fs');
+            const path = require('path');
+
+            const dbPath = path.join(__dirname, '../kinexis_database.db');
+            
+            const { filePath, canceled } = await dialog.showSaveDialog({
+                title: 'Exporter la base de données Kinexis',
+                defaultPath: `kinexis_backup_${new Date().toISOString().slice(0, 10)}.db`,
+                filters: [{ name: 'Base de données SQLite', extensions: ['db'] }]
+            });
+
+            if (canceled || !filePath) return { success: false };
+
+            fs.copyFileSync(dbPath, filePath);
+            return { success: true, path: filePath };
+        } catch (err) {
+            console.error("Erreur export BDD :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
+    // Restaurer une sauvegarde de la base de données SQLite
+    ipcMain.handle('db:restore', async () => {
+        try {
+            const { dialog } = require('electron');
+            const fs = require('fs');
+            const path = require('path');
+
+            const dbPath = path.join(__dirname, '../kinexis_database.db');
+
+            const { filePaths, canceled } = await dialog.showOpenDialog({
+                title: 'Restaurer une sauvegarde Kinexis',
+                filters: [{ name: 'Base de données SQLite', extensions: ['db'] }],
+                properties: ['openFile']
+            });
+
+            if (canceled || filePaths.length === 0) return { success: false };
+
+            const sourcePath = filePaths[0];
+            
+            // Sécurité : faire une copie de secours avant écrasement
+            const backupSecurite = dbPath + '.bak';
+            if (fs.existsSync(dbPath)) {
+                fs.copyFileSync(dbPath, backupSecurite);
+            }
+
+            fs.copyFileSync(sourcePath, dbPath);
+            return { success: true };
+        } catch (err) {
+            console.error("Erreur restauration BDD :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
     // ==========================================
     // AUTHENTIFICATION & UTILISATEURS (TABLE: utilisateurs)
     // ==========================================
@@ -121,6 +179,31 @@ ipcMain.handle('patients:add', (event, data) => {
     }
 });
 
+// Mettre à jour les informations d'un patient existant
+    ipcMain.handle('patients:update', (event, patientData) => {
+        try {
+            db.prepare(`
+                UPDATE patients 
+                SET nom = ?, prenom = ?, date_naissance = ?, sexe = ?, 
+                    poids_kg = ?, taille_cm = ?, telephone = ?, email = ?, 
+                    adresse = ?, sport_pratique = ?, profil_sportif = ?, 
+                    medecin_prescripteur = ?, medecin_chirurgien = ?, 
+                    remarques_cliniques = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(
+                patientData.nom, patientData.prenom, patientData.dateNaissance, patientData.sexe,
+                patientData.poidsKg, patientData.tailleCm, patientData.telephone, patientData.email,
+                patientData.adresse, patientData.sportPratique, patientData.profilSportif,
+                patientData.medecinPrescripteur, patientData.medecinChirurgien,
+                patientData.remarquesCliniques, patientData.id
+            );
+            return { success: true };
+        } catch (err) {
+            console.error("Erreur mise à jour patient :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
     // ==========================================
     // BILANS & PHOTOS (TABLES: bilans, resultats_bilan, photos_bilan)
     // ==========================================
@@ -211,6 +294,152 @@ ipcMain.handle('patients:add', (event, data) => {
             return { success: true, bilanId };
         } catch (err) {
             console.error("Erreur enregistrement bilan :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
+    // Récupérer tous les bilans d'un patient spécifique
+    ipcMain.handle('bilans:get-by-patient', (event, patientId) => {
+        try {
+            return db.prepare(`
+                SELECT b.*, u.prenom AS kine_prenom, u.nom AS kine_nom
+                FROM bilans b
+                LEFT JOIN utilisateurs u ON b.kine_id = u.id
+                WHERE b.patient_id = ? AND b.est_archive = 0
+                ORDER BY b.date_bilan DESC
+            `).all(patientId);
+        } catch (err) {
+            console.error("Erreur récupération bilans du patient :", err);
+            return [];
+        }
+    });
+
+    // Récupérer les détails complets d'un bilan spécifique
+    ipcMain.handle('bilans:get-details', (event, bilanId) => {
+        try {
+            const bilan = db.prepare(`
+                SELECT b.*, p.nom AS patient_nom, p.prenom AS patient_prenom, u.prenom AS kine_prenom, u.nom AS kine_nom
+                FROM bilans b
+                JOIN patients p ON b.patient_id = p.id
+                LEFT JOIN utilisateurs u ON b.kine_id = u.id
+                WHERE b.id = ?
+            `).get(bilanId);
+
+            if (!bilan) return { success: false, error: "Bilan introuvable" };
+
+            const resultats = db.prepare(`
+                SELECT * FROM resultats_bilan WHERE bilan_id = ?
+            `).all(bilanId);
+
+            return { success: true, bilan, resultats };
+        } catch (err) {
+            console.error("Erreur récupération détails bilan :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
+    // ==========================================
+    // SYSTÈME D'ARCHIVAGE (PATIENTS & BILANS)
+    // ==========================================
+
+    // Récupérer les patients archivés
+    ipcMain.handle('patients:get-archives', () => {
+        try {
+            return db.prepare(`
+                SELECT p.*, u.prenom AS archive_par_prenom, u.nom AS archive_par_nom
+                FROM patients p
+                LEFT JOIN utilisateurs u ON p.archive_par_kine_id = u.id
+                WHERE p.est_archive = 1
+                ORDER BY p.date_archivage DESC
+            `).all();
+        } catch (err) {
+            console.error("Erreur récupération patients archivés :", err);
+            return [];
+        }
+    });
+
+    // Archiver un patient (et ses bilans associés)
+    ipcMain.handle('patients:archive', (event, { patientId, kineId, motif }) => {
+        try {
+            const archiveTransaction = db.transaction(() => {
+                db.prepare(`
+                    UPDATE patients 
+                    SET est_archive = 1, 
+                        date_archivage = CURRENT_TIMESTAMP, 
+                        motif_archivage = ?, 
+                        archive_par_kine_id = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                `).run(motif || 'Fin de prise en charge', kineId || null, patientId);
+
+                db.prepare(`
+                    UPDATE bilans 
+                    SET est_archive = 1, 
+                        date_archivage = CURRENT_TIMESTAMP, 
+                        motif_archivage = ?
+                    WHERE patient_id = ? AND est_archive = 0
+                `).run('Archivage automatique du dossier patient', patientId);
+            });
+
+            archiveTransaction();
+            return { success: true };
+        } catch (err) {
+            console.error("Erreur archivage patient :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
+    // Restaurer (désarchiver) un patient
+    ipcMain.handle('patients:unarchive', (event, patientId) => {
+        try {
+            db.prepare(`
+                UPDATE patients 
+                SET est_archive = 0, 
+                    date_archivage = NULL, 
+                    motif_archivage = NULL, 
+                    archive_par_kine_id = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(patientId);
+            return { success: true };
+        } catch (err) {
+            console.error("Erreur désarchivage patient :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
+    // Archiver un bilan spécifique
+    ipcMain.handle('bilans:archive', (event, { bilanId, motif }) => {
+        try {
+            db.prepare(`
+                UPDATE bilans 
+                SET est_archive = 1, 
+                    date_archivage = CURRENT_TIMESTAMP, 
+                    motif_archivage = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(motif || 'Bilan archivé', bilanId);
+            return { success: true };
+        } catch (err) {
+            console.error("Erreur archivage bilan :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
+    // Restaurer (désarchiver) un bilan spécifique
+    ipcMain.handle('bilans:unarchive', (event, bilanId) => {
+        try {
+            db.prepare(`
+                UPDATE bilans 
+                SET est_archive = 0, 
+                    date_archivage = NULL, 
+                    motif_archivage = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(bilanId);
+            return { success: true };
+        } catch (err) {
+            console.error("Erreur désarchivage bilan :", err);
             return { success: false, error: err.message };
         }
     });

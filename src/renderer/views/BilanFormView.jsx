@@ -175,15 +175,16 @@ export default function BilanFormView({ currentKine }) {
     : { quad: 7.5, ischio: 4.5, soleaire: 18.0, fessier: 6.0, adducteur: 6.0 };
 
   const [planActionText, setPlanActionText] = useState('');
+  const [isManualEdit, setIsManualEdit] = useState(false);
 
   useEffect(() => {
-    if (ipcRenderer && patient.id) {
+    if (ipcRenderer && patient.id && !isManualEdit) {
       const dataBilan = { aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald };
       ipcRenderer.invoke('rules:calculer-texte', dataBilan, patient, cibles3M)
         .then(text => setPlanActionText(text))
         .catch(err => console.error("Erreur calcul règles :", err));
     }
-  }, [aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald, patient, cibles3M]);
+  }, [aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald, patient, cibles3M, isManualEdit]);
 
   const handleSaveBilan = async () => {
     if (!patient.id) {
@@ -270,11 +271,19 @@ export default function BilanFormView({ currentKine }) {
     return Math.round((Number(forceOperee) / Number(forceSaine)) * 100) - 100;
   };
 
-  const getLsiBadge = (lsiAbs) => {
-    if (!lsiAbs && lsiAbs !== 0) return <span className="text-slate-400 font-normal">-</span>;
-    if (Math.abs(lsiAbs) <= 10) return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white">{lsiAbs}%</span>;
-    if (Math.abs(lsiAbs) <= 20) return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500 text-white">{lsiAbs}%</span>;
-    return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500 text-white">{lsiAbs}%</span>;
+const getLsiBadge = (lsi) => {
+    if (!lsi && lsi !== 0) return <span className="text-slate-400 font-normal">-</span>;
+
+    if (lsi >= -10) {
+      // Positif ou très proche de l'équilibre -> Vert
+      return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white">{lsi}%</span>;
+    } else if (lsi >= -20) {
+      // Déficit modéré (moyen) -> Orange
+      return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500 text-white">{lsi}%</span>;
+    } else {
+      // Déficit important (négatif élevé) -> Rouge
+      return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500 text-white">{lsi}%</span>;
+    }
   };
 
   return (
@@ -355,7 +364,7 @@ export default function BilanFormView({ currentKine }) {
 
       <div className="h-1 bg-gradient-to-r from-[#E5A73C] via-[#E5A73C]/50 to-transparent rounded-full"></div>
 
-      {/* RANGÉE 1 : MOBILITÉ & CONFIANCE (AMPLITUDES ROM ALIGNÉES PROPREMENT) */}
+      {/* RANGÉE 1 : MOBILITÉ & CONFIANCE */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-4">
         <div className="flex items-center gap-3 border-b pb-3">
           <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">1</span>
@@ -393,7 +402,6 @@ export default function BilanFormView({ currentKine }) {
             </div>
           </div>
 
-          {/* AMPLITUDES ROM ALIGNÉES PARFAITEMENT EN GRILLE */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-3">
             <p className="font-bold text-slate-800 text-sm border-b pb-1">Amplitudes ROM (°)</p>
             
@@ -448,7 +456,7 @@ export default function BilanFormView({ currentKine }) {
         </div>
       </div>
 
-      {/* RANGÉE 2 : TESTS FONCTIONNELS (LIBELLÉS GROSSIS ET LISIBLES) */}
+      {/* RANGÉE 2 : TESTS FONCTIONNELS */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-6">
         <div className="flex items-center gap-3 border-b pb-3">
           <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">2</span>
@@ -456,15 +464,12 @@ export default function BilanFormView({ currentKine }) {
         </div>
 
         <div className="grid grid-cols-2 gap-8 items-start">
-          
-          {/* SOUS-BLOC A : QUALITATIFS (SQUAT & CMJ) - TEXTE GROSSI */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-4">
             <h4 className="font-extrabold text-amber-700 text-xs uppercase tracking-wider border-b border-amber-200 pb-2 flex justify-between items-center">
               <span>A. Test Fonctionnel Qualitatif</span>
               <span className="text-xs text-slate-500 font-semibold">Plateforme / Force</span>
             </h4>
 
-            {/* Squat Bipodal */}
             <div className="space-y-3 bg-white p-3.5 rounded-lg border border-slate-200">
               <p className="font-extrabold text-slate-800 text-sm">Squat Bipodal</p>
               <div className="grid grid-cols-3 gap-2 text-xs">
@@ -498,7 +503,6 @@ export default function BilanFormView({ currentKine }) {
               </div>
             </div>
 
-            {/* CMJ */}
             <div className="space-y-3 bg-white p-3.5 rounded-lg border border-slate-200">
               <p className="font-extrabold text-slate-800 text-sm">CMJ (Countermovement Jump)</p>
               <div className="grid grid-cols-3 gap-2 text-xs">
@@ -531,10 +535,8 @@ export default function BilanFormView({ currentKine }) {
                 </div>
               </div>
             </div>
-
           </div>
 
-          {/* SOUS-BLOC B : QUANTITATIFS (10 HOP TESTS ET AGILITÉ) - LIBELLÉS NOMS D'EXERCICES GROSSIS */}
           <div className="bg-slate-50 p-4 rounded-xl space-y-3">
             <h4 className="font-extrabold text-amber-700 text-xs uppercase tracking-wider border-b border-amber-200 pb-2 flex justify-between items-center">
               <span>B. Test Fonctionnel Quantitatif</span>
@@ -582,7 +584,6 @@ export default function BilanFormView({ currentKine }) {
               ))}
             </div>
           </div>
-
         </div>
       </div>
 
@@ -593,7 +594,6 @@ export default function BilanFormView({ currentKine }) {
           <h3 className="font-bold text-slate-800 text-base">Qualité du Mouvement</h3>
         </div>
 
-        {/* LATERAL STEP DOWN */}
         <div className="bg-slate-50 p-4 rounded-xl space-y-3 border border-slate-200 text-xs">
           <p className="font-bold text-slate-800 border-b pb-2 text-sm">Latéral Step Down</p>
           <div className="grid grid-cols-2 gap-6">
@@ -631,7 +631,6 @@ export default function BilanFormView({ currentKine }) {
           </div>
         </div>
 
-        {/* QASLS GRILLE */}
         <div className="bg-slate-50 p-4 rounded-xl space-y-4 border border-slate-200 text-xs">
           <div className="flex items-center justify-between border-b pb-2">
             <div>
@@ -725,7 +724,6 @@ export default function BilanFormView({ currentKine }) {
             </table>
           </div>
 
-          {/* CAPTURES PHOTOS */}
           <div className="pt-2">
             <p className="font-bold text-slate-800 text-xs mb-2">+ 2 photos: face jambe gauche, face jambe droite :</p>
             <div className="grid grid-cols-2 gap-4">
@@ -837,16 +835,38 @@ export default function BilanFormView({ currentKine }) {
         </table>
       </div>
 
-      {/* RANGÉE 5 : PLAN D'ACTION GÉNÉRÉ AUTOMATIQUEMENT */}
+      {/* RANGÉE 5 : PLAN D'ACTION GÉNÉRÉ AUTOMATIQUEMENT & MODIFIABLE */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/60 space-y-3">
-        <h3 className="font-extrabold text-slate-800 text-base">Plan d'Action & Directives de Rééducation (Rédigé automatiquement)</h3>
-        <p className="text-xs text-slate-500 font-medium">Ce texte se génère automatiquement selon vos saisies ci-dessus et reste modifiable avant l'export PDF :</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-extrabold text-slate-800 text-base">Plan d'Action & Directives de Rééducation</h3>
+            <p className="text-xs text-slate-500 font-medium">Généré automatiquement par le moteur de règles, mais entièrement modifiable et enrichissable manuellement :</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsManualEdit(false);
+              if (ipcRenderer && patient.id) {
+                const dataBilan = { aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald };
+                ipcRenderer.invoke('rules:calculer-texte', dataBilan, patient, cibles3M)
+                  .then(text => setPlanActionText(text))
+                  .catch(err => console.error("Erreur calcul règles :", err));
+              }
+            }}
+            className="text-xs text-slate-800 font-bold border border-slate-300 px-3 py-1.5 rounded-xl hover:bg-slate-50 shadow-sm flex items-center gap-1.5 transition-all"
+          >
+            <span>🔄</span> Régénérer l'auto
+          </button>
+        </div>
 
         <textarea
           rows={5}
           value={planActionText}
-          onChange={(e) => setPlanActionText(e.target.value)}
-          placeholder="Remplissez les mesures pour générer les consignes automatiques..."
+          onChange={(e) => {
+            setPlanActionText(e.target.value);
+            setIsManualEdit(true);
+          }}
+          placeholder="Remplissez les mesures pour générer les consignes automatiques ou saisissez vos notes personnelles ici..."
           className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs text-slate-900 font-bold leading-relaxed focus:outline-none focus:border-amber-500"
         />
       </div>
