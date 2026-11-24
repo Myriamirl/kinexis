@@ -9,13 +9,15 @@ export default function BilanFormView({ currentKine }) {
   const [patientsListe, setPatientsListe] = useState([]);
   const [selectedPatientId, setSelectedPatientId] = useState('');
   const [patient, setPatient] = useState({
-    id: null,
+id: null,
     nom: '',
     prenom: '',
     poids: 0,
     taille: 0,
-    coteOpere: 'Gauche',
-    profilSportif: 'Axe'
+    coteOpere: '',
+    profilSportif: '',
+    sport: '',
+    chirurgien: ''
   });
 
   useEffect(() => {
@@ -34,13 +36,15 @@ export default function BilanFormView({ currentKine }) {
 
   const updatePatientState = (pData) => {
     setPatient({
-      id: pData.id,
+id: pData.id,
       nom: pData.nom || '',
       prenom: pData.prenom || '',
       poids: pData.poids_kg || 0,
       taille: pData.taille_cm || 0,
-      coteOpere: pData.cote_opere || 'Gauche',
-      profilSportif: pData.profil_sportif || 'Axe'
+      coteOpere: pData.cote_opere || '',
+      profilSportif: pData.profil_sportif || '',
+      sport: pData.sport_pratique || '',
+      chirurgien: pData.medecin_chirurgien || ''
     });
   };
 
@@ -187,7 +191,7 @@ export default function BilanFormView({ currentKine }) {
     }
   }, [aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald, patient, isManualEdit]);
 
-const handleSaveBilan = async () => {
+  const handleSaveBilan = async () => {
     if (!patient.id) {
       alert("Veuillez sélectionner un patient avant d'enregistrer.");
       return null;
@@ -244,7 +248,9 @@ const handleSaveBilan = async () => {
       patient: {
         nom: `${patient.nom} ${patient.prenom}`,
         coteOpere: patient.coteOpere,
-        poids: patient.poids
+        poids: patient.poids,
+        taille: patient.taille,
+        profilSportif: patient.profilSportif
       },
       dataBilan: {
         dateBilan,
@@ -252,9 +258,17 @@ const handleSaveBilan = async () => {
         delaiPostOp,
         aclRsi,
         extG, extD, flexG, flexD,
+        cicatriceTrophicite, cicatriceAdherence, cicatriceSensibilite,
         vasteG, vasteD,
+        squatQual,
+        cmj,
+        hopTests,
+        qualiteStepDown,
+        qasls,
         vald,
-        planAction: planActionText
+        planAction: planActionText,
+        kineNom: currentKine ? `${currentKine.prenom || ''} ${currentKine.nom || ''}`.trim() : 'Cabinet CKS',
+        photos: { photoG, photoD }
       }
     };
 
@@ -288,13 +302,10 @@ const handleSaveBilan = async () => {
     if (!lsi && lsi !== 0) return <span className="text-slate-400 font-normal">-</span>;
 
     if (lsi >= -10) {
-      // Positif ou très proche de l'équilibre -> Vert
       return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white">{lsi}%</span>;
     } else if (lsi >= -20) {
-      // Déficit modéré (moyen) -> Orange
       return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500 text-white">{lsi}%</span>;
     } else {
-      // Déficit important (négatif élevé) -> Rouge
       return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500 text-white">{lsi}%</span>;
     }
   };
