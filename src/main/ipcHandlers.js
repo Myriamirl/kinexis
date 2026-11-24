@@ -1,4 +1,4 @@
-const { ipcMain } = require('electron');
+const { ipcMain,shell, dialog } = require('electron');
 const db = require('../database/db');
 const rulesEngine = require('../database/rulesEngine');
 const path = require('path');
@@ -10,6 +10,9 @@ function hashPassword(password) {
     return crypto.createHash('sha256').update(password).digest('hex');
 }
 
+// ==========================================
+    // EXPORT / RESTAURATION DE LA BASE DE DONNÉES SQLITE
+    // ==========================================
 function registerIpcHandlers() {
 
 // Exporter / Sauvegarder la base de données SQLite
@@ -66,6 +69,71 @@ function registerIpcHandlers() {
             return { success: true };
         } catch (err) {
             console.error("Erreur restauration BDD :", err);
+            return { success: false, error: err.message };
+        }   
+    });
+
+    // ==========================================
+    // GESTION DES PDF PAR BILAN (COLONNE chemin_pdf)
+    // ==========================================
+
+    const pdfStorageDir = path.join(__dirname, '../pdfs_bilans');
+    if (!fs.existsSync(pdfStorageDir)) {
+        fs.mkdirSync(pdfStorageDir, { recursive: true });
+    }
+
+    ipcMain.handle('bilans:save-pdf', (event, { bilanId, sourcePdfPath, nomFichier }) => {
+        try {
+            if (!bilanId || !sourcePdfPath || !fs.existsSync(sourcePdfPath)) {
+                return { success: false, error: "Bilan ou fichier PDF source introuvable." };
+            }
+
+            const safeName = nomFichier || `bilan_${bilanId}.pdf`;
+            const destPath = path.join(pdfStorageDir, `${bilanId}_${Date.now()}_${safeName}`);
+            fs.copyFileSync(sourcePdfPath, destPath);
+
+            db.prepare(`
+                UPDATE bilans
+                SET chemin_pdf = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(destPath, bilanId);
+
+            return { success: true, cheminPdf: destPath };
+        } catch (err) {
+            console.error("Erreur enregistrement chemin_pdf :", err);
+            return { success: false, error: err.message };
+        }
+    });
+
+    ipcMain.handle('bilans:open-pdf', async (event, cheminPdf) => {
+        try {
+            if (!cheminPdf || !fs.existsSync(cheminPdf)) {
+                return { success: false, error: "Le fichier PDF n'existe plus sur le disque." };
+            }
+            const errMsg = await shell.openPath(cheminPdf);
+            if (errMsg) return { success: false, error: errMsg };
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    });
+
+    ipcMain.handle('bilans:download-pdf', async (event, { cheminPdf, nomFichier }) => {
+        try {
+            if (!cheminPdf || !fs.existsSync(cheminPdf)) {
+                return { success: false, error: "Le fichier PDF source est introuvable." };
+            }
+            const { canceled, filePath } = await dialog.showSaveDialog({
+                title: 'Télécharger le bilan PDF',
+                defaultPath: nomFichier || 'bilan.pdf',
+                filters: [{ name: 'PDF', extensions: ['pdf'] }]
+            });
+
+            if (canceled || !filePath) return { success: false, cancelled: true };
+
+            fs.copyFileSync(cheminPdf, filePath);
+            return { success: true, savedPath: filePath };
+        } catch (err) {
             return { success: false, error: err.message };
         }
     });

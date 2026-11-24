@@ -155,6 +155,27 @@ export default function PatientsView({ currentKine, onStartBilan }) {
     const res = await ipcRenderer.invoke('patients:unarchive', patientId);
     if (res.success) chargerPatientsBDD();
   };
+const handleOpenBilanPdf = async (cheminPdf) => {
+    if (!ipcRenderer) return;
+    const res = await ipcRenderer.invoke('bilans:open-pdf', cheminPdf);
+    if (!res.success) {
+      alert(`❌ Impossible d'ouvrir le PDF : ${res.error}`);
+    }
+  };
+
+  const handleDownloadBilanPdf = async (bilan) => {
+    if (!ipcRenderer) return;
+    const nomFichier = `bilan_${selectedPatient?.nom || bilan.id}_${bilan.date_bilan || ''}.pdf`;
+    const res = await ipcRenderer.invoke('bilans:download-pdf', {
+      cheminPdf: bilan.chemin_pdf,
+      nomFichier
+    });
+    if (res.success) {
+      alert("✅ PDF téléchargé avec succès !");
+    } else if (!res.cancelled) {
+      alert(`❌ Erreur téléchargement : ${res.error}`);
+    }
+  };
 
   const handleSelectPatientForEdit = (p) => {
     setSelectedPatient(p);
@@ -168,6 +189,16 @@ export default function PatientsView({ currentKine, onStartBilan }) {
   const patientsArchivesFiltres = patientsArchives.filter(p =>
     `${p.nom} ${p.prenom}`.toLowerCase().includes(recherche.toLowerCase())
   );
+
+  const formatDateFR = (dateStr) => {
+    if (!dateStr) return '-';
+    const cleanDate = String(dateStr).split('T')[0];
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    return dateStr;
+  };
 
   return (
     <div className="space-y-6 w-full h-full flex flex-col text-slate-900">
@@ -257,7 +288,7 @@ export default function PatientsView({ currentKine, onStartBilan }) {
                       </div>
                       <span className="font-bold text-slate-900">{p.nom} {p.prenom}</span>
                     </td>
-                    <td className="py-3.5 text-slate-700">{p.date_naissance || '-'}</td>
+                    <td className="py-3.5 text-slate-700">{formatDateFR(p.date_naissance)}</td>
                     <td className="py-3.5 text-slate-700">{p.telephone || '-'} / {p.email || '-'}</td>
                     <td className="py-3.5">
                       <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-800">
@@ -415,23 +446,46 @@ export default function PatientsView({ currentKine, onStartBilan }) {
                   <th className="pb-3">Date d'Opération</th>
                   <th className="pb-3">Délai Post-Op</th>
                   <th className="pb-3">Kiné Référent</th>
+                  <th className="pb-3">Actions PDF</th>
                   <th className="pb-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold">
                 {bilansPatient.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50">
-                    <td className="py-3.5 font-bold text-slate-900">{b.date_bilan}</td>
-                    <td className="py-3.5 text-slate-700">{b.date_chirurgie || '-'}</td>
+                    <td className="py-3.5 font-bold text-slate-900">{formatDateFR(b.date_bilan)}</td>
+                    <td className="py-3.5 text-slate-700">{formatDateFR(b.date_chirurgie)}</td>
                     <td className="py-3.5">
                       <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
                         {b.temps_post_op_mois !== null && b.temps_post_op_mois !== undefined ? `${b.temps_post_op_mois} mois` : '-'}
                       </span>
                     </td>
                     <td className="py-3.5 text-slate-700">
-                      {b.kine_prenom ? `${b.kine_prenom} ${b.kine_nom}` : 'Cabinet CKS'}
-                    </td>
-                    <td className="py-3.5 text-right space-x-2">
+                    {b.kine_prenom ? `${b.kine_prenom} ${b.kine_nom}` : 'Cabinet CKS'}
+                  </td>
+                  <td className="py-3.5">
+                    {!b.chemin_pdf ? (
+                      <span className="text-slate-400 text-[11px]">-</span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenBilanPdf(b.chemin_pdf)}
+                          className="bg-[#0B1E3D] hover:bg-slate-800 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all"
+                        >
+                          Ouvrir
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadBilanPdf(b)}
+                          className="bg-[#E5A73C] hover:bg-[#d4962b] text-slate-950 px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all"
+                        >
+                          Télécharger
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="py-3.5 text-right space-x-2">
                       <button
                         onClick={() => handleViewBilanDetails(b.id)}
                         className="border border-slate-300 text-slate-800 px-3 py-1.5 rounded-xl font-bold hover:bg-slate-100"
@@ -454,7 +508,7 @@ export default function PatientsView({ currentKine, onStartBilan }) {
             <div className="flex justify-between items-center border-b pb-3">
               <div>
                 <h3 className="text-base font-extrabold text-slate-800">
-                  Détails du Bilan du {bilanModal.data?.date_bilan}
+                  Détails du Bilan du {formatDateFR(bilanModal.data?.date_bilan)}
                 </h3>
                 <p className="text-xs font-semibold text-slate-500">
                   Patient : {bilanModal.data?.patient_nom} {bilanModal.data?.patient_prenom} • Côté : {bilanModal.data?.cote_opere}
@@ -467,11 +521,11 @@ export default function PatientsView({ currentKine, onStartBilan }) {
               <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                 <div>
                   <span className="text-slate-500 block">Date d'opération :</span>
-                  <span className="font-bold text-slate-900">{bilanModal.data?.date_chirurgie || 'Non renseignée'}</span>
+                  <span className="font-bold text-slate-900">{formatDateFR(bilanModal.data?.date_chirurgie) || 'Non renseignée'}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block">Délai post-opératoire :</span>
-                  <span className="font-bold text-amber-800">{bilanModal.data?.temps_post_op_mois !== null ? `${bilanModal.data?.temps_post_op_mois} mois` : '-'}</span>
+                  <span className="font-bold text-amber-800">{bilanModal.data?.temps_post_op_mois !== null && bilanModal.data?.temps_post_op_mois !== undefined ? `${bilanModal.data?.temps_post_op_mois} mois` : '-'}</span>
                 </div>
               </div>
 

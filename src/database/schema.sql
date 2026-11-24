@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS bilans (
     mecanisme_lesionnel TEXT,
     statut TEXT DEFAULT 'en_cours' CHECK (statut IN ('en_cours', 'a_analyser', 'termine', 'valide')),
     plan_action_texte TEXT,
+    chemin_pdf TEXT,
     est_archive INTEGER DEFAULT 0 CHECK (est_archive IN (0, 1)),
     date_archivage DATETIME,
     motif_archivage TEXT,

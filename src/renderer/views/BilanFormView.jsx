@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 
 const { ipcRenderer } = window.require ? window.require('electron') : {};
 
+const CIBLES_3M = { quad: 5.5, ischio: 4.0, soleaire: 15.0, fessier: 5.0, adducteur: 5.0 };
+
 export default function BilanFormView({ currentKine }) {
   // --- ÉTAT PATIENTS ET SÉLECTION DEPUIS SQLITE ---
   const [patientsListe, setPatientsListe] = useState([]);
@@ -169,7 +171,6 @@ export default function BilanFormView({ currentKine }) {
     adducteurG: '', adducteurD: '',
   });
 
-  const cibles3M = { quad: 5.5, ischio: 4.0, soleaire: 15.0, fessier: 5.0, adducteur: 5.0 };
   const ciblesSport = patient.profilSportif === 'Pivot'
     ? { quad: 8.5, ischio: 5.0, soleaire: 20.0, fessier: 6.0, adducteur: 6.0 }
     : { quad: 7.5, ischio: 4.5, soleaire: 18.0, fessier: 6.0, adducteur: 6.0 };
@@ -180,21 +181,21 @@ export default function BilanFormView({ currentKine }) {
   useEffect(() => {
     if (ipcRenderer && patient.id && !isManualEdit) {
       const dataBilan = { aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald };
-      ipcRenderer.invoke('rules:calculer-texte', dataBilan, patient, cibles3M)
+      ipcRenderer.invoke('rules:calculer-texte', dataBilan, patient, CIBLES_3M)
         .then(text => setPlanActionText(text))
         .catch(err => console.error("Erreur calcul règles :", err));
     }
-  }, [aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald, patient, cibles3M, isManualEdit]);
+  }, [aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald, patient, isManualEdit]);
 
-  const handleSaveBilan = async () => {
+const handleSaveBilan = async () => {
     if (!patient.id) {
       alert("Veuillez sélectionner un patient avant d'enregistrer.");
-      return;
+      return null;
     }
 
     if (!ipcRenderer) {
       alert("Mode Web : Simulation d'enregistrement.");
-      return;
+      return null;
     }
 
     const payload = {
@@ -222,13 +223,16 @@ export default function BilanFormView({ currentKine }) {
     const res = await ipcRenderer.invoke('bilans:save', payload);
     if (res.success) {
       alert(`✅ Bilan enregistré en BDD pour ${patient.nom} ${patient.prenom} (ID Bilan : ${res.bilanId})`);
+      return res.bilanId;
     } else {
       alert(`❌ Erreur BDD : ${res.error}`);
+      return null;
     }
   };
 
   const handleExportPdf = async () => {
-    await handleSaveBilan();
+    const savedBilanId = await handleSaveBilan();
+    if (!savedBilanId) return;
 
     if (!ipcRenderer) {
       alert("Génération PDF disponible via Electron.");
@@ -236,6 +240,7 @@ export default function BilanFormView({ currentKine }) {
     }
 
     const payload = {
+      bilanId: savedBilanId,
       patient: {
         nom: `${patient.nom} ${patient.prenom}`,
         coteOpere: patient.coteOpere,
@@ -255,6 +260,14 @@ export default function BilanFormView({ currentKine }) {
 
     const res = await ipcRenderer.invoke('pdf:generate', payload);
     if (res.success) {
+      const sourcePdfPath = res.filePath || res.cheminPdf || res.path;
+      if (sourcePdfPath) {
+        await ipcRenderer.invoke('bilans:save-pdf', {
+          bilanId: savedBilanId,
+          sourcePdfPath,
+          nomFichier: `bilan_${patient.nom || savedBilanId}_${dateBilan}.pdf`
+        });
+      }
       alert(`✅ Compte-rendu PDF généré et enregistré !`);
     } else if (!res.cancelled) {
       alert(`❌ Erreur PDF : ${res.error}`);
@@ -271,7 +284,7 @@ export default function BilanFormView({ currentKine }) {
     return Math.round((Number(forceOperee) / Number(forceSaine)) * 100) - 100;
   };
 
-const getLsiBadge = (lsi) => {
+  const getLsiBadge = (lsi) => {
     if (!lsi && lsi !== 0) return <span className="text-slate-400 font-normal">-</span>;
 
     if (lsi >= -10) {
@@ -787,7 +800,7 @@ const getLsiBadge = (lsi) => {
               <td className="py-2"><input type="number" value={vald.quadD} onChange={(e) => setVald({ ...vald, quadD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.quadG} onChange={(e) => setVald({ ...vald, quadG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 text-slate-800">{calcRelative(vald.quadG)} N/kg</td>
-              <td className="py-2 text-slate-600">&gt;{cibles3M.quad} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{CIBLES_3M.quad} N/kg</td>
               <td className="py-2 text-slate-600">&gt;{ciblesSport.quad} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.quadG, vald.quadD))}</td>
             </tr>
@@ -797,7 +810,7 @@ const getLsiBadge = (lsi) => {
               <td className="py-2"><input type="number" value={vald.ischioD} onChange={(e) => setVald({ ...vald, ischioD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.ischioG} onChange={(e) => setVald({ ...vald, ischioG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 text-slate-800">{calcRelative(vald.ischioG)} N/kg</td>
-              <td className="py-2 text-slate-600">&gt;{cibles3M.ischio} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{CIBLES_3M.ischio} N/kg</td>
               <td className="py-2 text-slate-600">&gt;{ciblesSport.ischio} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.ischioG, vald.ischioD))}</td>
             </tr>
@@ -807,7 +820,7 @@ const getLsiBadge = (lsi) => {
               <td className="py-2"><input type="number" value={vald.soleaireD} onChange={(e) => setVald({ ...vald, soleaireD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.soleaireG} onChange={(e) => setVald({ ...vald, soleaireG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 text-slate-800">{calcRelative(vald.soleaireG)} N/kg</td>
-              <td className="py-2 text-slate-600">&gt;{cibles3M.soleaire} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{CIBLES_3M.soleaire} N/kg</td>
               <td className="py-2 text-slate-600">&gt;{ciblesSport.soleaire} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.soleaireG, vald.soleaireD))}</td>
             </tr>
@@ -817,7 +830,7 @@ const getLsiBadge = (lsi) => {
               <td className="py-2"><input type="number" value={vald.fessierD} onChange={(e) => setVald({ ...vald, fessierD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.fessierG} onChange={(e) => setVald({ ...vald, fessierG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 text-slate-800">{calcRelative(vald.fessierG)} N/kg</td>
-              <td className="py-2 text-slate-600">&gt;{cibles3M.fessier} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{CIBLES_3M.fessier} N/kg</td>
               <td className="py-2 text-slate-600">&gt;{ciblesSport.fessier} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.fessierG, vald.fessierD))}</td>
             </tr>
@@ -827,7 +840,7 @@ const getLsiBadge = (lsi) => {
               <td className="py-2"><input type="number" value={vald.adducteurD} onChange={(e) => setVald({ ...vald, adducteurD: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2"><input type="number" value={vald.adducteurG} onChange={(e) => setVald({ ...vald, adducteurG: e.target.value })} className="w-16 bg-slate-50 border border-slate-300 text-slate-900 rounded p-1 text-center font-bold" /></td>
               <td className="py-2 text-slate-800">{calcRelative(vald.adducteurG)} N/kg</td>
-              <td className="py-2 text-slate-600">&gt;{cibles3M.adducteur} N/kg</td>
+              <td className="py-2 text-slate-600">&gt;{CIBLES_3M.adducteur} N/kg</td>
               <td className="py-2 text-slate-600">&gt;{ciblesSport.adducteur} N/kg</td>
               <td className="py-2 text-right">{getLsiBadge(calcLSI(vald.adducteurG, vald.adducteurD))}</td>
             </tr>
@@ -848,7 +861,7 @@ const getLsiBadge = (lsi) => {
               setIsManualEdit(false);
               if (ipcRenderer && patient.id) {
                 const dataBilan = { aclRsi, extG, extD, vasteG, vasteD, qualiteStepDown, qasls, vald };
-                ipcRenderer.invoke('rules:calculer-texte', dataBilan, patient, cibles3M)
+                ipcRenderer.invoke('rules:calculer-texte', dataBilan, patient, CIBLES_3M)
                   .then(text => setPlanActionText(text))
                   .catch(err => console.error("Erreur calcul règles :", err));
               }

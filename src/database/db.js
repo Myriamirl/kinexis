@@ -23,9 +23,14 @@ const readyPromise = initSqlJs().then((SQL) => {
         sqlDb = new SQL.Database();
     }
 
-    if (fs.existsSync(schemaPath)) {
+if (fs.existsSync(schemaPath)) {
         const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
         sqlDb.run(schemaSql);
+        try {
+            sqlDb.run("ALTER TABLE bilans ADD COLUMN chemin_pdf TEXT;");
+        } catch (err) {
+            // La colonne existe déjà, on ignore
+        }
         saveToDisk();
     }
 
