@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const { ipcRenderer } = window.require ? window.require('electron') : {};
 
-export default function HomeView({ currentKine, onNavigate }) {
+export default function HomeView({ currentKine, onNavigate, onStartBilan, onSelectPatient, onSelectBilan }) {
   const [patientsRecents, setPatientsRecents] = useState([]);
   const [bilansRecents, setBilansRecents] = useState([]);
   const [recherche, setRecherche] = useState('');
@@ -15,6 +15,7 @@ export default function HomeView({ currentKine, onNavigate }) {
           if (data && Array.isArray(data)) {
             const formatted = data.slice(0, 5).map(p => ({
               id: p.id,
+              raw: p,
               initials: `${p.nom ? p.nom[0] : ''}${p.prenom ? p.prenom[0] : ''}`.toUpperCase(),
               nom: `${p.nom} ${p.prenom}`,
               date: p.date_naissance || 'Non renseignée',
@@ -65,7 +66,7 @@ export default function HomeView({ currentKine, onNavigate }) {
               className="bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#E5A73C] w-72 shadow-sm font-semibold"
             />
           </div>
-          <button 
+          <button
             onClick={() => onNavigate('patients')}
             className="bg-[#E5A73C] hover:bg-[#d4962b] text-slate-950 font-extrabold px-5 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
           >
@@ -91,7 +92,19 @@ export default function HomeView({ currentKine, onNavigate }) {
               </p>
             ) : (
               patientsFiltres.map((p) => (
-                <div key={p.id} className="flex items-center justify-between py-4">
+                <div
+                  key={p.id}
+                  onClick={() => onSelectPatient && onSelectPatient(p.raw || p)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onSelectPatient && onSelectPatient(p.raw || p);
+                    }
+                  }}
+                  className="flex items-center justify-between py-4 px-2 -mx-2 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors"
+                >
                   <div className="flex items-center gap-4">
                     <div className="w-11 h-11 rounded-full bg-[#0B1E3D] text-white font-extrabold text-sm flex items-center justify-center">
                       {p.initials}
@@ -138,7 +151,11 @@ export default function HomeView({ currentKine, onNavigate }) {
                 </tr>
               ) : (
                 bilansRecents.map((b, idx) => (
-                  <tr key={b.id || idx}>
+                  <tr
+                    key={b.id || idx}
+                    onClick={() => onSelectBilan && onSelectBilan(b)}
+                    className="hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
                     <td className="py-4 font-semibold text-slate-800">{b.patient_nom} {b.patient_prenom}</td>
                     <td className="py-4 text-slate-500 text-xs font-medium">{b.type_bilan || 'Post-LCA'}</td>
                     <td className="py-4 text-right">

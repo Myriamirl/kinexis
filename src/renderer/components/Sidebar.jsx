@@ -60,6 +60,18 @@ export default function Sidebar({ currentView, setCurrentView, currentKine, onLo
           </button>
 
           <button
+            onClick={() => setCurrentView('archives')}
+            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all ${
+              currentView === 'archives'
+                ? 'bg-[#E5A73C] text-slate-950 font-black shadow-md'
+                : 'text-slate-300 hover:bg-slate-800/50'
+            }`}
+          >
+            <span className="text-xl">🗄️</span> 
+            <span className="text-base font-bold">Patients archivés</span>
+          </button>
+
+          <button
             onClick={() => setCurrentView('settings')}
             className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all ${
               currentView === 'settings'

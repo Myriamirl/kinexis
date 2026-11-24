@@ -206,14 +206,35 @@ function registerIpcHandlers() {
     // PATIENTS (TABLE: patients)
     // ==========================================
 
-    ipcMain.handle('patients:get-actifs', () => {
-        try {
-            return db.prepare('SELECT * FROM patients WHERE est_archive = 0 ORDER BY nom ASC').all();
-        } catch (err) {
-            console.error("Erreur récupération patients :", err);
-            return [];
-        }
-    });
+ipcMain.handle('patients:get-actifs', () => {
+    try {
+        return db.prepare(`
+            SELECT
+                p.*,
+                b.date_bilan AS dernier_bilan_date,
+                t.titre AS dernier_bilan_nom,
+                b.cote_opere AS cote_opere,
+                b.date_chirurgie AS date_chirurgie,
+                b.technique_operatoire AS technique_operatoire
+            FROM patients p
+            LEFT JOIN bilans b
+                ON b.id = (
+                    SELECT b2.id
+                    FROM bilans b2
+                    WHERE b2.patient_id = p.id AND b2.est_archive = 0
+                    ORDER BY b2.date_bilan DESC, b2.id DESC
+                    LIMIT 1
+                )
+            LEFT JOIN templates_bilans t
+                ON t.id = b.template_id
+            WHERE p.est_archive = 0
+            ORDER BY p.nom ASC
+        `).all();
+    } catch (err) {
+        console.error("Erreur récupération patients :", err);
+        return [];
+    }
+});
 
     ipcMain.handle('patients:get-by-id', (event, patientId) => {
         try {

@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./ipcHandlers');
 const db = require('../database/db');
@@ -7,15 +7,22 @@ let mainWindow;
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 1280,
-        height: 800,
-        minWidth: 1024,
-        minHeight: 700,
+        minWidth: 400,
+        minHeight: 500,
         title: 'Kinexis - CKS Trélazé',
         backgroundColor: '#0F172A', // Teinte bleu foncé de la charte
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false
+        }
+    });
+
+    ipcMain.removeHandler('window:set-size');
+    ipcMain.handle('window:set-size', (event, { width, height, center = true }) => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.setSize(width, height);
+        if (center) {
+            mainWindow.center();
         }
     });
 
